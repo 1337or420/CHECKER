@@ -93,3 +93,80 @@ Checker/
 ├── data/                  # targets, results, found, geo, settings, sources
 └── start.bat
 ```
+
+---
+
+# CHECKER — English version
+
+> **Author:** 1337or420 Team · **Website:** [storona.shop](https://storona.shop)
+
+Web control panel for scanning, brute-forcing and harvesting credentials from Fortinet / FortiGate SSL-VPN.
+Architecture is based on **VPN_Brute 1.2.0** (`vpn_server`): signature presets (`*-param.json`), separated core and frontend.
+
+## Run
+
+Node.js 18+ (zero npm dependencies).
+
+```
+start.bat          # or: node server.js
+```
+
+Panel: **http://localhost:7000** (`PORT`, `HOST` environment variables).
+
+## What makes credential harvesting faster
+
+| Mechanism | Where | Effect |
+|---|---|---|
+| Keep-alive HTTP/HTTPS pools | `core/http.js` | no TLS handshake for every pair |
+| DNS cache with in-flight dedupe | `core/http.js` | no repeated lookups |
+| Global + per-host scheduler | `core/bruter.js` | hosts are not flooded, progress never stalls |
+| Priority to hosts with hits | `core/bruter.js` | more valid pairs per compromised host |
+| Circuit breaker + 429/503/timeout backoff | `core/bruter.js` | dead hosts dropped after 3 errors |
+| Known-pair skip (`found.json`) | `core/bruter.js` | repeated runs spend no requests |
+| Session confirmation (`/remote/index` + cookie) | `core/forti.js` | filters false positives |
+| `sslvpn_login_*` error parsing (locked/unknown/2FA) | `core/forti.js` | account state visibility |
+| `sslvpn_websession` leak (CVE-2018-13379) | `core/exploiter.js` | creds without brute force + SVPNCOOKIE |
+| `fortisslvpn_xml` recon (host/version) | `core/forti.js` | targeting vulnerable builds |
+| Rotating HTTP CONNECT proxies | `core/http.js` | bypass IP bans |
+| RPS limit, CIDR shuffle, batched saves | core/server | stable large-scale runs |
+
+A successful login is detected via `ret=1` **and/or** `Set-Cookie: SVPNCOOKIE`, then confirmed by loading the portal with that cookie. Results include the cookie and verification status.
+
+## Features
+
+| Module | Description |
+|---|---|
+| **Scanner** | CIDR / ranges / multi-port, TCP pre-check, 6 signature presets, random or edge (/24 .1/.2/.3/.254) sampling, decoy filtering |
+| **Brute force** | `smart` / `combo` / `cross` modes, threads + per-host limit + RPS, stop after N hits, built-in wordlists |
+| **Checker** | Re-validation of pairs and targets, alive/dead/locked/2FA states |
+| **Exploits** | CVE-2018-13379 credential leak, CVE-2022-40684, XML recon, version heuristics |
+| **Auto-chain** | Scanner hits go straight to brute force and CVE-2018-13379 harvesting |
+| **Geo / Sources** | 3 geo providers with cache, country CIDR lists (ipdeny + 3 mirrors) |
+| **Results** | TXT / CSV / JSON export, persistent `found_creds.txt` |
+
+## API
+
+- `GET  /api/status`
+- `GET/POST/DELETE /api/targets`
+- `POST /api/start` `{type: scan|brute|check|exploit|harvest, ...}`
+- `POST /api/pause`, `POST /api/stop`
+- `GET  /api/results`, `POST /api/results/clear`
+- `GET  /api/export?type=brute&format=txt|csv|json`
+- `GET  /api/found[?format=txt|csv]`, `DELETE /api/found`
+- `GET/POST /api/settings`, `GET/POST /api/wordlists`
+- `GET/POST /api/exploits`, `POST /api/geo`, `GET/POST /api/sources`
+- `GET  /api/events` — SSE event stream
+
+## Tests
+
+```
+node tests/mock.test.js   # local FortiGate mock: detect, brute, check, leak
+node tests/api.test.js    # REST API smoke test (server must run on :7099)
+node tests/ui.test.js     # UI runtime smoke test (DOM stub, inline handlers)
+```
+
+## Author
+
+**1337or420 Team** — [storona.shop](https://storona.shop)
+
+С ИИ можно прктически всё....
