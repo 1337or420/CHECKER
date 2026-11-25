@@ -28,6 +28,7 @@
         <li class="nav-item"><a class="nav-link" data-tab="tab-brute" href="#"><i class="bi bi-key me-1"></i>Брутфорс</a></li>
         <li class="nav-item"><a class="nav-link" data-tab="tab-checker" href="#"><i class="bi bi-check2-square me-1"></i>Чекер</a></li>
         <li class="nav-item"><a class="nav-link" data-tab="tab-exploit" href="#"><i class="bi bi-bug me-1"></i>Эксплоиты</a></li>
+        <li class="nav-item"><a class="nav-link" data-tab="tab-adrecon" href="#"><i class="bi bi-diagram-3 me-1"></i>ADRecon</a></li>
         <li class="nav-item"><a class="nav-link" data-tab="tab-geo" href="#"><i class="bi bi-globe2 me-1"></i>Гео / Источники</a></li>
         <li class="nav-item"><a class="nav-link" data-tab="tab-settings" href="#"><i class="bi bi-gear me-1"></i>Настройки</a></li>
         <li class="nav-item"><a class="nav-link" data-tab="tab-results" href="#"><i class="bi bi-table me-1"></i>Результаты</a></li>
@@ -239,6 +240,37 @@
                     <div class="card-box">
                         <h6><i class="bi bi-activity me-1"></i>Результаты проверки</h6>
                         <div class="live-list" id="exploitResults"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ ADRECON ============ -->
+        <div class="tab-pane fade" id="tab-adrecon">
+            <div class="row g-3">
+                <div class="col-md-5">
+                    <div class="card-box">
+                        <h6><i class="bi bi-diagram-3 me-1"></i>ADRecon (Go / Docker module)</h6>
+                        <p class="small text-muted" id="adreconInfo">загрузка…</p>
+                        <div class="d-grid gap-2 mb-3">
+                            <button class="btn btn-outline-info btn-sm" onclick="buildAdrecon()"><i class="bi bi-tools me-1"></i>Собрать модуль (go build)</button>
+                            <button class="btn btn-outline-success btn-sm" onclick="importAdrecon()"><i class="bi bi-box-arrow-in-right me-1"></i>Импортировать VPN-конфиги в цели</button>
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-4"><label class="form-label">Воркеры</label><input id="adWorkers" class="form-control" value="5"></div>
+                            <div class="col-4"><label class="form-label">Очередь</label><input id="adQueue" class="form-control" value="5"></div>
+                            <div class="col-4"><label class="form-label">Часов</label><input id="adHours" class="form-control" value="3"></div>
+                        </div>
+                        <button class="btn btn-success w-100 mt-3" onclick="startAdrecon()"><i class="bi bi-play-fill me-1"></i>Запустить ADRecon</button>
+                        <div class="small text-muted mt-2">Модуль работает в Docker: VPN → nmap → LDAP → kerbrute → reporter. Отчёты читаются автоматически.</div>
+                    </div>
+                </div>
+                <div class="col-md-7">
+                    <div class="card-box">
+                        <h6><i class="bi bi-terminal me-1"></i>Журнал модуля</h6>
+                        <div class="live-list" id="adreconLog" style="max-height:200px"></div>
+                        <h6 class="mt-3"><i class="bi bi-file-earmark-text me-1"></i>Отчёты <span class="badge bg-success" id="adReports">0</span></h6>
+                        <div class="live-list" id="adreconResults" style="max-height:200px"></div>
                     </div>
                 </div>
             </div>
