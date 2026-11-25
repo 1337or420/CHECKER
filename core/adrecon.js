@@ -140,6 +140,26 @@ function readReports(since) {
     return out;
 }
 
+function cleanupContainers() {
+    return new Promise(resolve => {
+        let out = '';
+        let p;
+        try { p = spawn('docker', ['ps', '-a', '--filter', 'ancestor=adrecon-runner:latest', '-q'], { windowsHide: true }); }
+        catch (e) { return resolve(0); }
+        p.stdout.on('data', d => out += d.toString());
+        p.on('error', () => resolve(0));
+        p.on('close', () => {
+            const ids = out.split(/\s+/).map(s => s.trim()).filter(Boolean);
+            if (!ids.length) return resolve(0);
+            let q;
+            try { q = spawn('docker', ['rm', '-f', ...ids], { windowsHide: true }); }
+            catch (e) { return resolve(0); }
+            q.on('error', () => resolve(0));
+            q.on('close', () => resolve(ids.length));
+        });
+    });
+}
+
 async function runTask(task, emit) {
     const started = Date.now();
     if (!fs.existsSync(EXE)) {
@@ -166,7 +186,8 @@ async function runTask(task, emit) {
     const onData = d => {
         const text = d.toString('utf8').replace(/\x1b\[[0-9;]*m/g, '');
         lastOut += text;
-        for (const line of text.split(/\r?\n/)) {
+        // orchestrator prints progress with a bare \r, not \n
+        for (const line of text.split(/\r\n|\n|\r/)) {
             const s = line.trim();
             if (!s) continue;
             const pr = parseProgress(s);
@@ -188,6 +209,7 @@ async function runTask(task, emit) {
             try {
                 if (process.platform === 'win32') spawn('taskkill', ['/PID', String(proc.pid), '/T', '/F'], { windowsHide: true });
                 else proc.kill('SIGTERM');
+                cleanupContainers().then(n => { if (n) emit('adrecon_log', { text: `[adrecon] остановлено контейнеров: ${n}` }); });
             } catch (e) { /* ignore */ }
             setTimeout(() => finish(-1), 1500);
         }, 250);
