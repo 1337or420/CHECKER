@@ -1,0 +1,9 @@
+data/results.json
+data/targets.json
+data/settings.json
+data/geo.json
+data/found.json
+data/found_creds.txt
+data/sources/
+node_modules/
+*.log
