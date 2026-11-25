@@ -147,7 +147,6 @@ async function addTargets() {
     refreshTargets();
 }
 
-$(document).onclick = null;
 document.addEventListener('click', e => {
     const del = e.target.closest('.del');
     if (del && del.dataset.id) { api('targets?id=' + encodeURIComponent(del.dataset.id), { method: 'DELETE' }).then(refreshTargets); }
