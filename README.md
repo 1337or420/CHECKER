@@ -42,6 +42,7 @@ start.bat          # или: node server.js
 | **Брутфорс** | Режимы `smart` / `combo` / `cross`, потоки + лимит на хост + RPS, стоп после N валидных, дефолтные словари |
 | **Чекер** | Ревалидация пар и целей, статусы alive/dead/locked/2FA |
 | **Эксплоиты** | CVE-2018-13379 (слив кред), CVE-2022-40684, XML-сниффинг, версионные эвристики |
+| **ADRecon** | Интегрированный Go/Docker модуль: VPN-конфиги → воркеры → отчёты; импорт конфигов в цели панели |
 | **Авто-цепочка** | Находки сканера автоматически уходят в брут и в слив кред (CVE-2018-13379) |
 | **Гео / Источники** | 3 гео-провайдера с кэшем, скачивание CIDR стран (ipdeny + 3 зеркала) |
 | **Результаты** | Экспорт TXT / CSV / JSON, накопительный `found_creds.txt` |
@@ -57,6 +58,7 @@ start.bat          # или: node server.js
 - `GET  /api/found[?format=txt|csv]`, `DELETE /api/found`
 - `GET/POST /api/settings` (прокси, RPS, параллельность, авто-брут)
 - `GET/POST /api/wordlists` (пользовательские словари)
+- `GET/POST /api/adrecon` (инфо, `build`, `import` VPN-конфигов); задача `type:'adrecon'`
 - `POST /api/exploits`, `GET /api/exploits`
 - `POST /api/geo`, `GET /api/sources`, `POST /api/sources`, `GET /api/sources/load?cc=`
 - `GET  /api/events` — SSE-поток событий
@@ -67,6 +69,7 @@ start.bat          # или: node server.js
 node tests/mock.test.js   # локальный FortiGate-мок: детект, брут, чек, слив кред
 node tests/api.test.js    # smoke-тест REST API (нужен запущенный сервер на :7099)
 node tests/ui.test.js     # smoke-тест UI (DOM-заглушка, обработчики кнопок)
+node tests/adrecon.test.js # парсер VPN-конфигов и статус модуля ADRecon
 ```
 
 ## Автор
@@ -90,6 +93,8 @@ Checker/
 │   ├── sources.js         # CIDR-базы
 │   ├── store.js           # атомарное JSON-хранилище
 │   ├── settings.js / targets.js / lines.js / checker.js
+│   └── adrecon.js          # обёртка над Go/Docker модулем
+├── adrecon/                # ADRecon (Go orchestrator + scripts)
 ├── public/                # панель
 ├── data/                  # targets, results, found, geo, settings, sources
 └── start.bat
@@ -141,6 +146,7 @@ A successful login is detected via `ret=1` **and/or** `Set-Cookie: SVPNCOOKIE`, 
 | **Brute force** | `smart` / `combo` / `cross` modes, threads + per-host limit + RPS, stop after N hits, built-in wordlists |
 | **Checker** | Re-validation of pairs and targets, alive/dead/locked/2FA states |
 | **Exploits** | CVE-2018-13379 credential leak, CVE-2022-40684, XML recon, version heuristics |
+| **ADRecon** | Integrated Go/Docker module: VPN configs -> workers -> reports; config import into checker targets |
 | **Auto-chain** | Scanner hits go straight to brute force and CVE-2018-13379 harvesting |
 | **Geo / Sources** | 3 geo providers with cache, country CIDR lists (ipdeny + 3 mirrors) |
 | **Results** | TXT / CSV / JSON export, persistent `found_creds.txt` |
@@ -155,6 +161,7 @@ A successful login is detected via `ret=1` **and/or** `Set-Cookie: SVPNCOOKIE`, 
 - `GET  /api/export?type=brute&format=txt|csv|json`
 - `GET  /api/found[?format=txt|csv]`, `DELETE /api/found`
 - `GET/POST /api/settings`, `GET/POST /api/wordlists`
+- `GET/POST /api/adrecon` (info, `build`, `import`), task `type:'adrecon'`
 - `GET/POST /api/exploits`, `POST /api/geo`, `GET/POST /api/sources`
 - `GET  /api/events` — SSE event stream
 
@@ -164,6 +171,7 @@ A successful login is detected via `ret=1` **and/or** `Set-Cookie: SVPNCOOKIE`, 
 node tests/mock.test.js   # local FortiGate mock: detect, brute, check, leak
 node tests/api.test.js    # REST API smoke test (server must run on :7099)
 node tests/ui.test.js     # UI runtime smoke test (DOM stub, inline handlers)
+node tests/adrecon.test.js # ADRecon config parser and module info
 ```
 
 ## Author
