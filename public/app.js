@@ -33,6 +33,11 @@ es.addEventListener('check_hit', e => addLive('checkResults', fmtCred(JSON.parse
 es.addEventListener('check_target', e => addLive('checkResults', fmtTarget(JSON.parse(e.data))));
 es.addEventListener('exploit_result', e => addLive('exploitResults', fmtExploit(JSON.parse(e.data))));
 es.addEventListener('exploit_cred', e => { addLive('exploitResults', fmtCred(JSON.parse(e.data))); });
+es.addEventListener('adrecon_log', e => { const d = JSON.parse(e.data); addLive('adreconLog', `<span class="mono">${esc(d.text)}</span>`); appendLog('[adrecon] ' + d.text); });
+es.addEventListener('adrecon_progress', e => setProgress(JSON.parse(e.data)));
+es.addEventListener('adrecon_hit', e => { const d = JSON.parse(e.data); addLive('adreconResults', `<span class="tag">[REPORT]</span><span class="mono">${esc(d.file)}</span><span class="t">${esc(JSON.stringify(d.summary || {}).slice(0, 120))}</span>`); bump('adReports'); });
+es.addEventListener('adrecon_start', e => appendLog('[adrecon] запуск: ' + JSON.stringify(JSON.parse(e.data))));
+es.addEventListener('adrecon_done', e => appendLog('[adrecon] завершено: ' + JSON.stringify(JSON.parse(e.data))));
 es.addEventListener('task_state', e => updateState(JSON.parse(e.data)));
 es.addEventListener('task_done', e => { updateState({ running: false }); loadResults(); refreshStats(); });
 
@@ -247,6 +252,46 @@ async function startHarvest() {
     switchTab('tab-exploit');
 }
 
+// ---------------- ADRecon ----------------
+async function loadAdrecon() {
+    const r = await api('adrecon');
+    const i = r.info || r;
+    $('adreconInfo').innerHTML = `Модуль: <b>${esc(i.path || '')}</b><br>
+        Собрано: <b>${i.built ? 'да' : 'нет'}</b> · Go: <b>${i.go ? 'да' : 'нет'}</b><br>
+        VPN-конфигов: <b>${i.configs || 0}</b> · отчётов: <b>${i.reportCount || 0}</b>`;
+    const box = $('adreconResults');
+    box.innerHTML = '';
+    for (const rep of (i.reports || []).slice(0, 20)) {
+        const div = document.createElement('div');
+        div.className = 'live-item';
+        div.innerHTML = `<span class="mono">${esc(rep.file)}</span><span class="t">${esc(JSON.stringify(rep.summary || {}).slice(0, 100))}</span>`;
+        box.appendChild(div);
+    }
+    $('adReports').textContent = String(i.reportCount || 0);
+}
+
+async function buildAdrecon() {
+    appendLog('[adrecon] сборка модуля...');
+    const r = await api('adrecon', { method: 'POST', body: { action: 'build' } });
+    appendLog(r.ok ? '[adrecon] сборка OK' : '[adrecon] сборка ошибка: ' + (r.error || ''));
+    loadAdrecon();
+}
+
+async function importAdrecon() {
+    const r = await api('adrecon', { method: 'POST', body: { action: 'import' } });
+    appendLog(`[adrecon] импортировано ${r.configs || 0} конфигов, целей добавлено ${r.added || 0}`);
+    refreshTargets();
+}
+
+async function startAdrecon() {
+    const r = await api('start', {
+        method: 'POST',
+        body: { type: 'adrecon', workers: +$('adWorkers').value, queue: +$('adQueue').value, hours: +$('adHours').value },
+    });
+    if (r.error) return alert(r.error);
+    switchTab('tab-adrecon');
+}
+
 async function togglePause() { await api('pause', { method: 'POST' }); }
 async function stopTask() { await api('stop', { method: 'POST' }); }
 
@@ -307,6 +352,7 @@ function switchTab(id) {
     });
     if (id === 'tab-results') loadResults();
     if (id === 'tab-geo') { refreshSources(); loadExclude(); }
+    if (id === 'tab-adrecon') loadAdrecon();
 }
 document.querySelectorAll('#mainTabs .nav-link').forEach(a => a.addEventListener('click', e => { e.preventDefault(); switchTab(a.dataset.tab); }));
 window.addEventListener('error', e => appendLog('[JS ERROR] ' + e.message));
@@ -426,5 +472,5 @@ async function deleteSource(cc) {
 }
 
 // ---------------- init ----------------
-refreshStats(); refreshTargets(); loadExploits(); loadResults(); loadSettings(); updateState({ running: false });
+refreshStats(); refreshTargets(); loadExploits(); loadResults(); loadSettings(); loadAdrecon(); updateState({ running: false });
 setInterval(refreshStats, 4000);
