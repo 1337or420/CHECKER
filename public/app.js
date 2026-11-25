@@ -126,6 +126,8 @@ function updateState(st) {
         badge.textContent = 'Idle';
         $('taskInfo').textContent = '— нет активных задач —';
         $('rateInfo').textContent = '';
+        const bar = $('progressBar');
+        if (bar) { bar.style.width = '0%'; bar.textContent = st.stopped ? 'остановлено' : '0%'; }
     }
 }
 
