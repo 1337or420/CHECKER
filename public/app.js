@@ -1,0 +1,431 @@
+'use strict';
+// CHECKER panel frontend
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[<>&"]/g, ch => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[ch]));
+const ts = iso => new Date(iso || Date.now()).toLocaleTimeString();
+
+async function api(path, opts = {}) {
+    const res = await fetch('/api/' + path, {
+        method: opts.method || 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        body: opts.body ? JSON.stringify(opts.body) : undefined,
+    });
+    try { return await res.json(); } catch (e) { return {}; }
+}
+
+// ---------------- SSE ----------------
+const es = new EventSource('/api/events');
+es.addEventListener('hello', e => { $('versionBadge').textContent = 'v' + JSON.parse(e.data).version; });
+es.addEventListener('log', e => appendLog(JSON.parse(e.data).text));
+es.addEventListener('scan_hit', e => { addLive('scanResults', fmtScan(JSON.parse(e.data))); bump('scanFound'); });
+es.addEventListener('scan_skip', e => {
+    const d = JSON.parse(e.data);
+    addLive('scanResults', `<span class="text-muted">[SKIP ${esc((d.cc || '').toUpperCase())}]</span><span>${esc(d.host)}:${esc(d.port)}</span><span class="t">${esc(d.country || '')}</span>`);
+});
+es.addEventListener('scan_progress', e => setProgress(JSON.parse(e.data)));
+es.addEventListener('brute_progress', e => setProgress(JSON.parse(e.data)));
+es.addEventListener('check_progress', e => setProgress(JSON.parse(e.data)));
+es.addEventListener('exploit_progress', e => setProgress(JSON.parse(e.data)));
+es.addEventListener('brute_target', e => { const d = JSON.parse(e.data); if (!d.alive) appendLog(`[brute] мёртв: ${d.url} (${d.reason || ''})`); });
+es.addEventListener('brute_hit', e => { addLive('bruteResults', fmtCred(JSON.parse(e.data))); bump('bruteFound'); });
+es.addEventListener('check_hit', e => addLive('checkResults', fmtCred(JSON.parse(e.data))));
+es.addEventListener('check_target', e => addLive('checkResults', fmtTarget(JSON.parse(e.data))));
+es.addEventListener('exploit_result', e => addLive('exploitResults', fmtExploit(JSON.parse(e.data))));
+es.addEventListener('exploit_cred', e => { addLive('exploitResults', fmtCred(JSON.parse(e.data))); });
+es.addEventListener('task_state', e => updateState(JSON.parse(e.data)));
+es.addEventListener('task_done', e => { updateState({ running: false }); loadResults(); refreshStats(); });
+
+function bump(id) { const el = $(id); if (el) el.textContent = String((parseInt(el.textContent, 10) || 0) + 1); }
+
+function setProgress(d) {
+    if (!d || !d.total) return;
+    const done = d.done ?? d.tried ?? d.checked ?? 0;
+    const pct = Math.min(100, Math.round((done / d.total) * 100));
+    const bar = $('progressBar');
+    bar.style.width = pct + '%';
+    bar.textContent = `${pct}% (${done}/${d.total}${d.valid ? ', valid: ' + d.valid : ''}${d.found ? ', found: ' + d.found : ''})`;
+    $('rateInfo').textContent = d.rate ? d.rate.toFixed(1) + ' кред/с' : '';
+}
+
+function appendLog(text) {
+    const box = $('logBox');
+    box.value += text + '\n';
+    if (box.value.length > 200000) box.value = box.value.slice(-150000);
+    box.scrollTop = box.scrollHeight;
+}
+
+function addLive(id, html) {
+    const c = $(id);
+    if (!c) return;
+    const div = document.createElement('div');
+    div.className = 'live-item';
+    div.innerHTML = html;
+    c.prepend(div);
+    while (c.childElementCount > 800) c.lastElementChild.remove();
+}
+
+function fmtScan(d) {
+    const geo = d.country ? ` <span class="tag">${esc(d.flag || '')} ${esc(d.country)}</span>` : '';
+    return `<span class="tag">[FOUND]</span><span class="mono">${esc(d.url)}</span>${geo}<span class="t">${esc(d.product)}</span>`;
+}
+
+function fmtCred(d) {
+    const cookie = d.cookie ? `<span class="cookie" title="${esc(d.cookie)}">cookie</span>` : '';
+    const badge = d.verify === 'session_ok' ? '<span class="tag">[SESSION OK]</span>' : '<span class="tag">[VALID]</span>';
+    const host = String(d.url || '').replace(/^https?:\/\//, '');
+    const line = `${host}:${d.username}:${d.password}`;
+    return `${badge}<span class="mono cred" data-copy="${esc(line)}" title="копировать">${esc(line)}</span>${cookie}<span class="t">${ts(d.time)}</span>`;
+}
+
+function fmtTarget(d) {
+    const cls = d.alive ? 'tag' : 'text-danger';
+    const extra = [d.product, d.version ? 'v' + d.version : null, d.hostname].filter(Boolean).join(' ');
+    return `<span class="${cls}">[${d.alive ? 'ALIVE' : 'DEAD'}]</span><span class="mono">${esc(d.url)}</span><span class="t">${esc(extra)}</span>`;
+}
+
+function fmtExploit(d) {
+    const cls = d.vulnerable ? 'tag' : 'text-muted';
+    const label = d.kind === 'cred' ? 'CRED' : (d.vulnerable ? 'VULN' : 'NO');
+    return `<span class="${cls}">[${label}]</span><span class="mono">${esc(d.url)}</span><span>${esc(d.exploit || '')}</span><span class="t">${esc(d.detail || d.status || '')}</span>`;
+}
+
+// click-to-copy
+document.addEventListener('click', e => {
+    const el = e.target.closest('.cred');
+    if (!el || !el.dataset.copy) return;
+    navigator.clipboard?.writeText(el.dataset.copy);
+    el.classList.add('copied');
+    setTimeout(() => el.classList.remove('copied'), 600);
+});
+
+// ---------------- status ----------------
+async function refreshStats() {
+    const s = await api('status');
+    $('statTargets').textContent = s.targets ?? 0;
+    $('statFound').textContent = s.found ?? 0;
+    $('statQueue').textContent = s.autoQueue ?? 0;
+    $('statBrute').textContent = s.counts ? s.counts.brute : 0;
+    $('statCheck').textContent = s.counts ? s.counts.check : 0;
+    $('statExploit').textContent = s.counts ? s.counts.exploit : 0;
+}
+
+function updateState(st) {
+    const badge = $('statusBadge');
+    if (st.running) {
+        badge.className = 'badge bg-success';
+        badge.textContent = 'RUN: ' + st.type + (st.paused ? ' (пауза)' : '');
+        $('taskInfo').textContent = 'Выполняется: ' + st.type;
+    } else {
+        badge.className = 'badge bg-secondary';
+        badge.textContent = 'Idle';
+        $('taskInfo').textContent = '— нет активных задач —';
+        $('rateInfo').textContent = '';
+    }
+}
+
+// ---------------- targets ----------------
+async function refreshTargets() {
+    const r = await api('targets');
+    const list = $('targetList');
+    list.innerHTML = '';
+    for (const t of r.targets || []) {
+        const row = document.createElement('div');
+        row.className = 'target-row';
+        row.innerHTML = `<span class="mono">${esc(t.url.replace(/^https?:\/\//, ''))}</span><span class="del" data-id="${esc(t.id)}"><i class="bi bi-x"></i></span>`;
+        list.appendChild(row);
+    }
+    $('statTargets').textContent = (r.targets || []).length;
+}
+
+async function addTargets() {
+    const urls = $('targetInput').value.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    if (!urls.length) return;
+    const r = await api('targets', { method: 'POST', body: { urls } });
+    $('targetInput').value = '';
+    appendLog(`[targets] добавлено ${r.added ?? 0}`);
+    refreshTargets();
+}
+
+$(document).onclick = null;
+document.addEventListener('click', e => {
+    const del = e.target.closest('.del');
+    if (del && del.dataset.id) { api('targets?id=' + encodeURIComponent(del.dataset.id), { method: 'DELETE' }).then(refreshTargets); }
+});
+
+async function clearTargets() { await api('targets', { method: 'POST', body: { action: 'clear' } }); refreshTargets(); }
+
+function exportTargets() {
+    api('targets').then(r => {
+        const text = (r.targets || []).map(t => t.url.replace(/^https?:\/\//, '')).join('\r\n');
+        download('targets.txt', text);
+    });
+}
+
+function download(name, text, type = 'text/plain') {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type }));
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+// ---------------- task starters ----------------
+function startCurrent() {
+    if ($('bruteUsers').value.trim() || $('brutePasses').value.trim()) startBrute();
+    else if ($('scanRanges').value.trim()) startScan();
+    else startExploit();
+}
+
+async function startScan() {
+    const r = await api('start', {
+        method: 'POST',
+        body: {
+            type: 'scan',
+            ranges: $('scanRanges').value,
+            ports: $('scanPorts').value.split(/[\s,;]+/).map(Number).filter(Boolean),
+            ssl: $('scanSsl').checked,
+            threads: +$('scanThreads').value,
+            tcpTimeout: +$('scanTcp').value,
+            timeout: +$('scanTimeout').value,
+            limit: +$('scanLimit').value,
+            autoAdd: $('scanAutoAdd').checked,
+            keepOpen: $('scanKeepOpen').checked,
+            strategy: $('scanStrategy').value,
+            preset: $('scanPreset').value,
+        },
+    });
+    if (r.error) return alert(r.error);
+    switchTab('tab-scanner');
+}
+
+const fallback = id => { const v = $(id).value.split(/\r?\n/).map(s => s.trim()).filter(Boolean); return v.length ? v : null; };
+const creds = (threads, perHost, timeout, resume) => ({
+    threads: +threads.value, perHost: +perHost.value, timeout: +timeout.value, resume: resume.checked,
+});
+
+async function startBrute() {
+    const shared = creds($('bruteThreads'), $('brutePerHost'), $('bruteTimeout'), $('bruteResume'));
+    const r = await api('start', {
+        method: 'POST',
+        body: {
+            type: 'brute', targets: fallback('targetInput'),
+            usernames: $('bruteUsers').value, passwords: $('brutePasses').value,
+            mode: $('bruteMode').value, rps: +$('bruteRps').value,
+            maxHits: +$('bruteMaxHits').value, stopOnHit: $('bruteStopOnHit').checked, ...shared,
+        },
+    });
+    if (r.error) return alert(r.error);
+    switchTab('tab-brute');
+}
+
+async function startCheck() {
+    const shared = creds($('checkThreads'), $('checkPerHost'), $('checkTimeout'), $('checkResume'));
+    const r = await api('start', {
+        method: 'POST',
+        body: {
+            type: 'check', targets: fallback('checkTargets'),
+            credentials: $('checkCreds').value, ...shared,
+        },
+    });
+    if (r.error) return alert(r.error);
+    switchTab('tab-checker');
+}
+
+async function startExploit() {
+    const selected = [...document.querySelectorAll('.ex-chk:checked')].map(x => x.value);
+    const r = await api('start', {
+        method: 'POST',
+        body: { type: 'exploit', threads: +$('exploitThreads').value, timeout: +$('exploitTimeout').value, exploits: selected },
+    });
+    if (r.error) return alert(r.error);
+    switchTab('tab-exploit');
+}
+
+async function startHarvest() {
+    const r = await api('start', { method: 'POST', body: { type: 'harvest', threads: +$('exploitThreads').value, timeout: +$('exploitTimeout').value } });
+    if (r.error) return alert(r.error);
+    switchTab('tab-exploit');
+}
+
+async function togglePause() { await api('pause', { method: 'POST' }); }
+async function stopTask() { await api('stop', { method: 'POST' }); }
+
+// ---------------- results ----------------
+let resultTab = 'scan';
+
+async function loadResults() {
+    const r = await api('results');
+    const list = (r.results && r.results[resultTab]) || [];
+    $('resultsBox').value = list.map(x => x.line || JSON.stringify(x)).join('\n');
+    if (r.logs) { $('logBox').value = r.logs.join('\n') + '\n'; $('logBox').scrollTop = $('logBox').scrollHeight; }
+}
+
+async function clearResults() {
+    await api('results/clear', { method: 'POST' });
+    loadResults(); refreshStats();
+    document.querySelectorAll('.live-list').forEach(e => e.innerHTML = '');
+}
+
+function exportResults(format) { window.location = `/api/export?type=${resultTab}&format=${format}`; }
+function exportFound(format) { window.location = `/api/found?format=${format}`; }
+
+document.querySelectorAll('.res-tab').forEach(a => a.addEventListener('click', e => {
+    e.preventDefault();
+    document.querySelectorAll('.res-tab').forEach(x => x.classList.remove('active'));
+    a.classList.add('active');
+    resultTab = a.dataset.tab;
+    loadResults();
+}));
+
+// ---------------- exploits / wordlists ----------------
+async function loadExploits() {
+    const r = await api('exploits');
+    const box = $('exploitList');
+    box.innerHTML = '';
+    for (const ex of r.exploits || []) {
+        const div = document.createElement('div');
+        div.className = 'form-check';
+        div.innerHTML = `<input class="form-check-input ex-chk" type="checkbox" value="${esc(ex.id)}" checked>
+            <label class="form-check-label"><strong>${esc(ex.id)}</strong> — ${esc(ex.name)}</label>`;
+        box.appendChild(div);
+    }
+}
+
+async function loadWords(kind) {
+    const r = await api('wordlists?kind=' + kind);
+    const target = kind === 'users' ? $('bruteUsers') : $('brutePasses');
+    target.value = (r[kind] || []).join('\n');
+    appendLog(`[wordlist] ${kind}: ${(r[kind] || []).length}`);
+}
+
+// ---------------- tabs ----------------
+function switchTab(id) {
+    document.querySelectorAll('#mainTabs .nav-link').forEach(a => a.classList.toggle('active', a.dataset.tab === id));
+    document.querySelectorAll('.tab-pane').forEach(p => {
+        p.classList.toggle('active', p.id === id);
+        p.classList.toggle('show', p.id === id);
+    });
+    if (id === 'tab-results') loadResults();
+    if (id === 'tab-geo') { refreshSources(); loadExclude(); }
+}
+document.querySelectorAll('#mainTabs .nav-link').forEach(a => a.addEventListener('click', e => { e.preventDefault(); switchTab(a.dataset.tab); }));
+window.addEventListener('error', e => appendLog('[JS ERROR] ' + e.message));
+
+// ---------------- settings / geo / sources ----------------
+async function loadSettings() {
+    const r = await api('settings');
+    const s = r.settings || {};
+    $('excludeInput').value = (s.excludeCountries || []).join(', ');
+    $('proxyInput').value = (s.proxy || []).join('\n');
+    $('maxSockets').value = s.maxSockets ?? 600;
+    $('retries').value = s.retries ?? 1;
+    $('perHost').value = s.perHost ?? 4;
+    $('rps').value = s.rps ?? 0;
+    $('userAgent').value = s.userAgent || '';
+    $('autoBrute').checked = !!s.autoBrute;
+    $('autoHarvest').checked = s.autoHarvest !== false;
+    $('autoAddTargets').checked = s.autoAddTargets !== false;
+}
+
+async function saveSettings() {
+    await api('settings', {
+        method: 'POST',
+        body: {
+            maxSockets: +$('maxSockets').value, retries: +$('retries').value, perHost: +$('perHost').value,
+            rps: +$('rps').value, userAgent: $('userAgent').value,
+            autoBrute: $('autoBrute').checked, autoHarvest: $('autoHarvest').checked, autoAddTargets: $('autoAddTargets').checked,
+        },
+    });
+    appendLog('[settings] сохранено');
+}
+
+async function saveExclude() {
+    const list = $('excludeInput').value.split(/[,\s;]+/).map(s => s.trim()).filter(Boolean);
+    await api('settings', { method: 'POST', body: { excludeCountries: list } });
+    appendLog('[settings] исключены: ' + list.join(', '));
+}
+function resetExclude() { loadSettings(); }
+
+async function saveProxy() {
+    const text = $('proxyInput').value;
+    const r = await api('settings', { method: 'POST', body: { proxyText: text } });
+    $('proxyResult').textContent = 'прокси в списке: ' + (r.settings ? r.settings.proxy.length : 0);
+    appendLog('[proxy] сохранено');
+}
+
+async function testProxy() {
+    $('proxyResult').textContent = 'проверка...';
+    const r = await api('proxy/test', { method: 'POST' });
+    $('proxyResult').textContent = r.ok ? ('IP: ' + (r.body || '') + ' (прокси: ' + (r.proxies ? r.proxies.count : 0) + ')') : ('ошибка: ' + (r.error || r.status));
+}
+
+async function lookupGeo() {
+    const t = await api('targets');
+    const urls = (t.targets || []).map(x => x.url);
+    const r = await api('geo', { method: 'POST', body: { urls } });
+    const box = $('geoList');
+    box.innerHTML = '';
+    const entries = Object.entries(r.geo || {}).sort((a, b) => (a[1].country || '').localeCompare(b[1].country || ''));
+    for (const [host, g] of entries) {
+        const div = document.createElement('div');
+        div.className = 'live-item';
+        div.innerHTML = `<span>${esc(g.flag)} ${esc(g.country || '?')}</span><span class="mono">${esc(host)}</span>`;
+        box.appendChild(div);
+    }
+    appendLog(`[geo] определено: ${entries.length}`);
+}
+
+async function refreshSources() {
+    const r = await api('sources');
+    const box = $('sourcesList');
+    box.innerHTML = '';
+    if (!(r.list || []).length) box.innerHTML = '<div class="live-item text-muted">— пока ничего не скачано —</div>';
+    for (const s of r.list || []) {
+        const div = document.createElement('div');
+        div.className = 'live-item';
+        div.innerHTML = `<span><span class="tag">${esc(s.cc.toUpperCase())}</span> ${s.count} CIDR</span>
+            <span>
+              <i class="bi bi-box-arrow-in-right text-success" style="cursor:pointer" title="В сканер" data-load="${esc(s.cc)}"></i>
+              &nbsp;<i class="bi bi-trash text-danger" style="cursor:pointer" title="Удалить" data-del="${esc(s.cc)}"></i>
+            </span>`;
+        box.appendChild(div);
+    }
+}
+
+document.addEventListener('click', e => {
+    const load = e.target.closest('[data-load]');
+    if (load) loadToScanner(load.dataset.load);
+    const del = e.target.closest('[data-del]');
+    if (del) deleteSource(del.dataset.del);
+});
+
+async function downloadCountry() {
+    const cc = $('ccInput').value.trim().toLowerCase();
+    if (cc.length !== 2) return alert('Код страны: ua, de, us ...');
+    appendLog(`[sources] скачивание ${cc}...`);
+    const r = await api('sources', { method: 'POST', body: { action: 'download', cc } });
+    const res = (r.results || [])[0] || {};
+    appendLog(`[sources] ${cc}: ${res.count || 0} CIDR`);
+    $('ccInput').value = '';
+    refreshSources();
+    if (!res.count) alert('Не удалось скачать ' + cc.toUpperCase());
+}
+
+async function loadToScanner(cc) {
+    const r = await api('sources/load?cc=' + encodeURIComponent(cc));
+    if (!r.ok) return alert('Не скачано');
+    const existing = $('scanRanges').value.trim();
+    $('scanRanges').value = (existing ? existing + '\n' : '') + r.cidrs.join('\n');
+    appendLog(`[sources] ${cc.toUpperCase()}: ${r.count} CIDR → сканер`);
+    switchTab('tab-scanner');
+}
+
+async function deleteSource(cc) {
+    await fetch('/api/sources/' + encodeURIComponent(cc) + '/file', { method: 'DELETE' });
+    refreshSources();
+}
+
+// ---------------- init ----------------
+refreshStats(); refreshTargets(); loadExploits(); loadResults(); loadSettings(); updateState({ running: false });
+setInterval(refreshStats, 4000);
