@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CHECKER — Fortinet/FortiGate Panel</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="style.css" rel="stylesheet">
+</head>
+<body>
+<nav class="navbar navbar-dark px-3">
+    <span class="navbar-brand fw-bold fs-4">
+        <i class="bi bi-shield-lock me-2 text-success"></i>CHECKER
+        <small class="fs-6 text-success ms-2">Fortinet / FortiGate Panel</small>
+    </span>
+    <div class="d-flex align-items-center gap-3">
+        <a href="https://storona.shop" target="_blank" rel="noopener" class="text-decoration-none small text-muted">storona.shop · 1337or420 Team</a>
+        <span id="statusBadge" class="badge bg-secondary">Idle</span>
+        <span class="badge bg-dark border border-secondary" id="versionBadge">v2.0.0</span>
+    </div>
+</nav>
+
+<div class="container-xxl mt-3">
+    <ul class="nav nav-tabs panel-tabs" id="mainTabs" role="tablist">
+        <li class="nav-item"><a class="nav-link active" data-tab="tab-dashboard" href="#"><i class="bi bi-speedometer2 me-1"></i>Панель</a></li>
+        <li class="nav-item"><a class="nav-link" data-tab="tab-scanner" href="#"><i class="bi bi-radar me-1"></i>Сканер</a></li>
+        <li class="nav-item"><a class="nav-link" data-tab="tab-brute" href="#"><i class="bi bi-key me-1"></i>Брутфорс</a></li>
+        <li class="nav-item"><a class="nav-link" data-tab="tab-checker" href="#"><i class="bi bi-check2-square me-1"></i>Чекер</a></li>
+        <li class="nav-item"><a class="nav-link" data-tab="tab-exploit" href="#"><i class="bi bi-bug me-1"></i>Эксплоиты</a></li>
+        <li class="nav-item"><a class="nav-link" data-tab="tab-geo" href="#"><i class="bi bi-globe2 me-1"></i>Гео / Источники</a></li>
+        <li class="nav-item"><a class="nav-link" data-tab="tab-settings" href="#"><i class="bi bi-gear me-1"></i>Настройки</a></li>
+        <li class="nav-item"><a class="nav-link" data-tab="tab-results" href="#"><i class="bi bi-table me-1"></i>Результаты</a></li>
+    </ul>
+
+    <div class="tab-content bg-panel p-3">
+        <!-- ============ DASHBOARD ============ -->
+        <div class="tab-pane fade show active" id="tab-dashboard">
+            <div class="row g-3">
+                <div class="col-6 col-md-2"><div class="stat-card"><div class="stat-num" id="statTargets">0</div><div class="stat-label">Цели</div></div></div>
+                <div class="col-6 col-md-2"><div class="stat-card"><div class="stat-num" id="statFound">0</div><div class="stat-label">Найдено кред</div></div></div>
+                <div class="col-6 col-md-2"><div class="stat-card"><div class="stat-num" id="statBrute">0</div><div class="stat-label">Валид (брут)</div></div></div>
+                <div class="col-6 col-md-2"><div class="stat-card"><div class="stat-num" id="statCheck">0</div><div class="stat-label">Валид (чек)</div></div></div>
+                <div class="col-6 col-md-2"><div class="stat-card"><div class="stat-num" id="statExploit">0</div><div class="stat-label">Уязвимости</div></div></div>
+                <div class="col-6 col-md-2"><div class="stat-card"><div class="stat-num" id="statQueue">0</div><div class="stat-label">Очередь</div></div></div>
+            </div>
+            <div class="row g-3 mt-1">
+                <div class="col-md-4">
+                    <div class="card-box h-100">
+                        <h6><i class="bi bi-hdd-network me-1"></i>Цели (Targets)</h6>
+                        <div class="d-flex gap-2 mb-2">
+                            <button class="btn btn-sm btn-outline-success" onclick="refreshTargets()"><i class="bi bi-arrow-clockwise"></i></button>
+                            <button class="btn btn-sm btn-outline-primary" onclick="clearTargets()"><i class="bi bi-trash"></i> Очистить</button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="exportTargets()"><i class="bi bi-download"></i> Экспорт</button>
+                        </div>
+                        <textarea id="targetInput" class="form-control mono mb-2" rows="6" placeholder="host.com:10443&#10;192.168.1.1&#10;связка: 1.2.3.4:10443:admin:password&#10;связка: 1.2.3.4:admin:password"></textarea>
+                        <button class="btn btn-success btn-sm w-100" onclick="addTargets()"><i class="bi bi-plus-lg me-1"></i>Добавить цели</button>
+                        <div id="targetList" class="target-list mt-2"></div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card-box h-100">
+                        <h6><i class="bi bi-gear me-1"></i>Управление</h6>
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-success" onclick="startCurrent()"><i class="bi bi-play-fill me-1"></i>Старт</button>
+                            <button class="btn btn-secondary" onclick="togglePause()"><i class="bi bi-pause-fill me-1"></i>Пауза / Продолжить</button>
+                            <button class="btn btn-danger" onclick="stopTask()"><i class="bi bi-stop-fill me-1"></i>Стоп</button>
+                        </div>
+                        <hr>
+                        <div class="progress" style="height: 22px;">
+                            <div id="progressBar" class="progress-bar bg-success" style="width:0%">0%</div>
+                        </div>
+                        <div class="mt-2 small text-muted" id="taskInfo">— нет активных задач —</div>
+                        <div class="small text-muted" id="rateInfo"></div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card-box h-100">
+                        <h6><i class="bi bi-terminal me-1"></i>Логи</h6>
+                        <textarea id="logBox" class="form-control log-box" rows="14" readonly></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ SCANNER ============ -->
+        <div class="tab-pane fade" id="tab-scanner">
+            <div class="row g-3">
+                <div class="col-md-5">
+                    <div class="card-box">
+                        <h6><i class="bi bi-radar me-1"></i>Настройки сканирования</h6>
+                        <label class="form-label mt-2">Диапазоны / IP (CIDR, a-b, по строке)</label>
+                        <textarea id="scanRanges" class="form-control mono" rows="7" placeholder="192.168.1.0/24&#10;10.0.0.1-10.0.0.50&#10;example.com"></textarea>
+                        <div class="row g-2 mt-2">
+                            <div class="col-4"><label class="form-label">Порты</label><input id="scanPorts" class="form-control" value="443,10443,8443,4443"></div>
+                            <div class="col-4"><label class="form-label">Потоки</label><input id="scanThreads" class="form-control" value="300"></div>
+                            <div class="col-4"><label class="form-label">TCP мс</label><input id="scanTcp" class="form-control" value="1200"></div>
+                        </div>
+                        <div class="row g-2 mt-2">
+                            <div class="col-6"><label class="form-label">Timeout</label><input id="scanTimeout" class="form-control" value="6000"></div>
+                            <div class="col-6"><label class="form-label">Лимит хостов (0=все)</label><input id="scanLimit" class="form-control" value="0"></div>
+                        </div>
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" id="scanSsl" checked><label class="form-check-label" for="scanSsl">HTTPS</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="scanAutoAdd" checked><label class="form-check-label" for="scanAutoAdd">Добавлять находки в цели</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="scanKeepOpen"><label class="form-check-label" for="scanKeepOpen">Сохранять все открытые хосты</label>
+                        </div>
+                        <label class="form-label mt-2">Стратегия выбора хостов</label>
+                        <select id="scanStrategy" class="form-select">
+                            <option value="edge">Шлюзы /24 (.1 .2 .3 .4 .253 .254) — больше находок</option>
+                            <option value="random">Случайные IP по всем диапазонам</option>
+                        </select>
+                        <label class="form-label mt-2">Пресет сигнатур</label>
+                        <select id="scanPreset" class="form-select">
+                            <option value="fortinet">Fortinet FortiGate SSL-VPN</option>
+                            <option value="cisco">Cisco ASA AnyConnect</option>
+                            <option value="watchguard">WatchGuard SSL-VPN</option>
+                            <option value="citrix">Citrix NetScaler</option>
+                            <option value="pulse">Pulse / Ivanti</option>
+                            <option value="globalprotect">Palo Alto GlobalProtect</option>
+                        </select>
+                        <button class="btn btn-success w-100 mt-3" onclick="startScan()"><i class="bi bi-play-fill me-1"></i>Начать сканирование</button>
+                    </div>
+                </div>
+                <div class="col-md-7">
+                    <div class="card-box">
+                        <h6><i class="bi bi-broadcast me-1"></i>Найденные цели <span class="badge bg-success" id="scanFound">0</span></h6>
+                        <div class="live-list" id="scanResults"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ BRUTE ============ -->
+        <div class="tab-pane fade" id="tab-brute">
+            <div class="row g-3">
+                <div class="col-md-5">
+                    <div class="card-box">
+                        <h6><i class="bi bi-key me-1"></i>Брутфорс SSL-VPN</h6>
+                        <div class="d-flex justify-content-between align-items-end">
+                            <label class="form-label mt-2">Логины <small class="text-muted">(или связки в целях)</small></label>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="loadWords('users')"><i class="bi bi-download"></i> дефолт</button>
+                        </div>
+                        <textarea id="bruteUsers" class="form-control mono" rows="5" placeholder="admin"></textarea>
+                        <div class="d-flex justify-content-between align-items-end">
+                            <label class="form-label mt-2">Пароли</label>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="loadWords('passes')"><i class="bi bi-download"></i> дефолт</button>
+                        </div>
+                        <textarea id="brutePasses" class="form-control mono" rows="6" placeholder="Fortinet&#10;admin&#10;123456"></textarea>
+                        <div class="row g-2 mt-2">
+                            <div class="col-4"><label class="form-label">Потоки</label><input id="bruteThreads" class="form-control" value="60"></div>
+                            <div class="col-4"><label class="form-label">На хост</label><input id="brutePerHost" class="form-control" value="4"></div>
+                            <div class="col-4"><label class="form-label">RPS (0=∞)</label><input id="bruteRps" class="form-control" value="0"></div>
+                        </div>
+                        <div class="row g-2 mt-2">
+                            <div class="col-4"><label class="form-label">Режим</label>
+                                <select id="bruteMode" class="form-select">
+                                    <option value="smart">Умный</option>
+                                    <option value="combo">Парный</option>
+                                    <option value="cross">Перекрёстный</option>
+                                </select>
+                            </div>
+                            <div class="col-4"><label class="form-label">Стоп после N</label><input id="bruteMaxHits" class="form-control" value="3"></div>
+                            <div class="col-4"><label class="form-label">Timeout</label><input id="bruteTimeout" class="form-control" value="10000"></div>
+                        </div>
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" id="bruteStopOnHit" checked><label class="form-check-label" for="bruteStopOnHit">Останавливать хост после N валидных</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="bruteResume" checked><label class="form-check-label" for="bruteResume">Пропускать уже найденные пары</label>
+                        </div>
+                        <button class="btn btn-success w-100 mt-3" onclick="startBrute()"><i class="bi bi-play-fill me-1"></i>Запустить брутфорс</button>
+                    </div>
+                </div>
+                <div class="col-md-7">
+                    <div class="card-box">
+                        <h6><i class="bi bi-unlock me-1"></i>Валидные пары <span class="badge bg-success" id="bruteFound">0</span>
+                            <button class="btn btn-sm btn-outline-success float-end" onclick="exportFound('txt')"><i class="bi bi-download"></i> TXT</button>
+                            <button class="btn btn-sm btn-outline-secondary float-end me-1" onclick="exportFound('csv')"><i class="bi bi-filetype-csv"></i></button>
+                        </h6>
+                        <div class="live-list" id="bruteResults"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ CHECKER ============ -->
+        <div class="tab-pane fade" id="tab-checker">
+            <div class="row g-3">
+                <div class="col-md-5">
+                    <div class="card-box">
+                        <h6><i class="bi bi-check2-square me-1"></i>Чекер аккаунтов</h6>
+                        <label class="form-label mt-2">Цели / связки (ip:port:login:password)</label>
+                        <textarea id="checkTargets" class="form-control mono" rows="4" placeholder="1.2.3.4:10443:admin:pass&#10;пусто — цели из панели"></textarea>
+                        <label class="form-label mt-2">Учётные данные (login:password)</label>
+                        <textarea id="checkCreds" class="form-control mono" rows="6" placeholder="admin:password"></textarea>
+                        <div class="row g-2 mt-2">
+                            <div class="col-4"><label class="form-label">Потоки</label><input id="checkThreads" class="form-control" value="60"></div>
+                            <div class="col-4"><label class="form-label">На хост</label><input id="checkPerHost" class="form-control" value="4"></div>
+                            <div class="col-4"><label class="form-label">Timeout</label><input id="checkTimeout" class="form-control" value="10000"></div>
+                        </div>
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" id="checkResume" checked><label class="form-check-label" for="checkResume">Пропускать уже найденные пары</label>
+                        </div>
+                        <button class="btn btn-success w-100 mt-3" onclick="startCheck()"><i class="bi bi-play-fill me-1"></i>Запустить проверку</button>
+                    </div>
+                </div>
+                <div class="col-md-7">
+                    <div class="card-box">
+                        <h6><i class="bi bi-shield-check me-1"></i>Валид / Статус целей</h6>
+                        <div class="live-list" id="checkResults"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ EXPLOIT ============ -->
+        <div class="tab-pane fade" id="tab-exploit">
+            <div class="row g-3">
+                <div class="col-md-5">
+                    <div class="card-box">
+                        <h6><i class="bi bi-bug me-1"></i>Эксплоиты / слив кред</h6>
+                        <div class="d-grid gap-2 mb-2">
+                            <button class="btn btn-outline-success btn-sm" onclick="startHarvest()"><i class="bi bi-magnet me-1"></i>Только слив кред (CVE-2018-13379)</button>
+                        </div>
+                        <div id="exploitList" class="mb-2"></div>
+                        <div class="row g-2">
+                            <div class="col-6"><label class="form-label">Потоки</label><input id="exploitThreads" class="form-control" value="12"></div>
+                            <div class="col-6"><label class="form-label">Timeout</label><input id="exploitTimeout" class="form-control" value="10000"></div>
+                        </div>
+                        <button class="btn btn-success w-100 mt-3" onclick="startExploit()"><i class="bi bi-play-fill me-1"></i>Проверить цели</button>
+                    </div>
+                </div>
+                <div class="col-md-7">
+                    <div class="card-box">
+                        <h6><i class="bi bi-activity me-1"></i>Результаты проверки</h6>
+                        <div class="live-list" id="exploitResults"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ GEO / SOURCES ============ -->
+        <div class="tab-pane fade" id="tab-geo">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="card-box mb-3">
+                        <h6><i class="bi bi-globe2 me-1"></i>Определение стран целей</h6>
+                        <p class="small text-muted">Определяет страну для целей панели (ipwho.is → ip-api → ipapi.co, кэш).</p>
+                        <button class="btn btn-success w-100 mb-2" onclick="lookupGeo()"><i class="bi bi-geo-alt me-1"></i>Определить страны</button>
+                        <div class="live-list" id="geoList" style="max-height:280px"></div>
+                    </div>
+                    <div class="card-box">
+                        <h6><i class="bi bi-slash-circle me-1"></i>Исключённые страны</h6>
+                        <p class="small text-muted">Находки из этих стран не попадают в цели при сканировании.</p>
+                        <textarea id="excludeInput" class="form-control mb-2" rows="3" placeholder="ru, ua, kz ..."></textarea>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-success flex-fill" onclick="saveExclude()"><i class="bi bi-save me-1"></i>Сохранить</button>
+                            <button class="btn btn-outline-secondary" onclick="resetExclude()"><i class="bi bi-arrow-counterclockwise"></i></button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card-box">
+                        <h6><i class="bi bi-cloud-download me-1"></i>CIDR-базы по странам</h6>
+                        <p class="small text-muted">ipdeny.com + зеркала (GitHub / jsDelivr / ipverse). Скачайте страну → загрузите в сканер.</p>
+                        <div class="d-flex gap-2 mb-2">
+                            <input id="ccInput" class="form-control" placeholder="ua, de, us ..." maxlength="2">
+                            <button class="btn btn-success" onclick="downloadCountry()"><i class="bi bi-download me-1"></i>Скачать</button>
+                        </div>
+                        <div class="live-list" id="sourcesList" style="max-height:300px"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ SETTINGS ============ -->
+        <div class="tab-pane fade" id="tab-settings">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="card-box">
+                        <h6><i class="bi bi-hdd-stack me-1"></i>Прокси (HTTP CONNECT, ротация)</h6>
+                        <p class="small text-muted">По одному на строку: <code>http://user:pass@host:port</code>. Пусто — прямое соединение.</p>
+                        <textarea id="proxyInput" class="form-control mono" rows="6" placeholder="http://127.0.0.1:8080"></textarea>
+                        <div class="d-flex gap-2 mt-2">
+                            <button class="btn btn-success" onclick="saveProxy()"><i class="bi bi-save me-1"></i>Сохранить</button>
+                            <button class="btn btn-outline-info" onclick="testProxy()"><i class="bi bi-plug me-1"></i>Проверить IP</button>
+                        </div>
+                        <div class="small mono mt-2" id="proxyResult"></div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card-box">
+                        <h6><i class="bi bi-speedometer me-1"></i>Производительность</h6>
+                        <div class="row g-2">
+                            <div class="col-6"><label class="form-label">Сокетов в пуле</label><input id="maxSockets" class="form-control" value="600"></div>
+                            <div class="col-6"><label class="form-label">Ретраев на запрос</label><input id="retries" class="form-control" value="1"></div>
+                            <div class="col-6"><label class="form-label">На хост по умолчанию</label><input id="perHost" class="form-control" value="4"></div>
+                            <div class="col-6"><label class="form-label">RPS по умолчанию</label><input id="rps" class="form-control" value="0"></div>
+                            <div class="col-12"><label class="form-label">User-Agent (пусто = ротация)</label><input id="userAgent" class="form-control mono"></div>
+                        </div>
+                        <div class="form-check mt-3">
+                            <input class="form-check-input" type="checkbox" id="autoBrute"><label class="form-check-label" for="autoBrute">Авто-брут новых находок сканера</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="autoHarvest" checked><label class="form-check-label" for="autoHarvest">Авто-слив кред (CVE-2018-13379)</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="autoAddTargets" checked><label class="form-check-label" for="autoAddTargets">Авто-добавление находок в цели</label>
+                        </div>
+                        <button class="btn btn-success w-100 mt-3" onclick="saveSettings()"><i class="bi bi-save me-1"></i>Сохранить настройки</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ RESULTS ============ -->
+        <div class="tab-pane fade" id="tab-results">
+            <div class="card-box">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="mb-0"><i class="bi bi-table me-1"></i>Все результаты</h6>
+                    <div>
+                        <button class="btn btn-sm btn-outline-success" onclick="exportResults('txt')"><i class="bi bi-download me-1"></i>TXT</button>
+                        <button class="btn btn-sm btn-outline-success" onclick="exportResults('csv')"><i class="bi bi-download me-1"></i>CSV</button>
+                        <button class="btn btn-sm btn-outline-success" onclick="exportResults('json')"><i class="bi bi-download me-1"></i>JSON</button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="clearResults()"><i class="bi bi-trash me-1"></i>Очистить</button>
+                    </div>
+                </div>
+                <ul class="nav nav-pills mb-2" id="resultTabs">
+                    <li class="nav-item"><a class="nav-link active res-tab" data-tab="scan" href="#">Scan</a></li>
+                    <li class="nav-item"><a class="nav-link res-tab" data-tab="brute" href="#">Brute</a></li>
+                    <li class="nav-item"><a class="nav-link res-tab" data-tab="check" href="#">Check</a></li>
+                    <li class="nav-item"><a class="nav-link res-tab" data-tab="exploit" href="#">Exploit</a></li>
+                </ul>
+                <textarea id="resultsBox" class="form-control log-box" rows="18" readonly></textarea>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
