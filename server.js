@@ -17,6 +17,7 @@ const sources = require('./core/sources');
 const settings = require('./core/settings');
 const wordlists = require('./core/wordlists');
 const httpc = require('./core/http');
+const adrecon = require('./core/adrecon');
 const { PRESETS, EXPLOITS } = require('./core/signatures');
 
 const PORT = parseInt(process.env.PORT || '7000', 10);
@@ -25,7 +26,7 @@ const PUBLIC = path.join(__dirname, 'public');
 const VERSION = '2.0.0';
 const MAX_RESULTS = 100000;
 
-const results = store.load('results.json', { scan: [], brute: [], check: [], exploit: [], open: [] });
+const results = store.load('results.json', { scan: [], brute: [], check: [], exploit: [], open: [], adrecon: [] });
 for (const k of Object.keys(results)) if (!Array.isArray(results[k])) results[k] = [];
 const logs = [];
 const clients = new Set();
@@ -64,7 +65,7 @@ function persistSoon() {
     saveTimer.unref && saveTimer.unref();
 }
 
-const PREFIX = /^(scan|brute|check|exploit)_/;
+const PREFIX = /^(scan|brute|check|exploit|adrecon)_/;
 
 function makeEmitter(type) {
     return (event, data) => {
@@ -112,10 +113,11 @@ const RUNNERS = {
     check: checker.checkTask,
     exploit: exploiter.exploitTask,
     harvest: exploiter.harvestTask,
+    adrecon: adrecon.runTask,
 };
 
 function startTask(type, params, isAuto) {
-    if (task) return { error: 'task already running: ' + task.type };
+    if (task && !task.stopped) return { error: 'task already running: ' + task.type };
     const fn = RUNNERS[type];
     if (!fn) return { error: 'bad type' };
     const ctl = { type, stopped: false, paused: false, started: Date.now() };
@@ -247,7 +249,7 @@ const server = http.createServer(async (req, res) => {
                         progress: task ? task.progress || null : null,
                         queues: { brute: autoQueue.length, harvest: harvestQueue.length },
                         targets: targets.count(), autoQueue: autoQueue.length,
-                        counts: { scan: results.scan.length, brute: results.brute.length, check: results.check.length, exploit: results.exploit.length, open: (results.open || []).length },
+                        counts: { scan: results.scan.length, brute: results.brute.length, check: results.check.length, exploit: results.exploit.length, open: (results.open || []).length, adrecon: (results.adrecon || []).length },
                         found: store.readText('found_creds.txt').split('\n').filter(Boolean).length,
                         proxy: httpc.proxyStats().count, geo: geo.stats(),
                         logs: logs.slice(-200),
@@ -273,7 +275,12 @@ const server = http.createServer(async (req, res) => {
                 // ---------------- tasks
                 case '/api/start': {
                     const type = body.type;
-                    if (!['scan', 'brute', 'check', 'exploit', 'harvest'].includes(type)) return send(res, 400, { error: 'bad type' });
+                    if (!['scan', 'brute', 'check', 'exploit', 'harvest', 'adrecon'].includes(type)) return send(res, 400, { error: 'bad type' });
+                    if (type === 'adrecon') {
+                        return send(res, 200, startTask('adrecon', {
+                            workers: body.workers || 5, queue: body.queue || 5, hours: body.hours || 3,
+                        }));
+                    }
                     if (type === 'scan') {
                         const parsed = httpc.parseRanges(body.ranges || '');
                         if (!parsed.length) return send(res, 400, { error: 'no hosts' });
@@ -367,6 +374,23 @@ const server = http.createServer(async (req, res) => {
                         return send(res, 200, { ok: true, settings: s });
                     }
                     return send(res, 200, { ok: true, settings: settings.get() });
+
+                // ---------------- ADRecon module
+                case '/api/adrecon': {
+                    if (req.method === 'POST') {
+                        if (body.action === 'build') {
+                            const r = await adrecon.build((ev, data) => broadcast('adrecon_log', data));
+                            return send(res, r.ok ? 200 : 500, r);
+                        }
+                        if (body.action === 'import') {
+                            const r = adrecon.importConfigs(body.targets !== false);
+                            log(`adrecon: imported ${r.configs} configs (${r.added} targets)`);
+                            return send(res, 200, { ok: true, ...r });
+                        }
+                        return send(res, 400, { error: 'bad action' });
+                    }
+                    return send(res, 200, { ok: true, ...(await adrecon.info()) });
+                }
 
                 // ---------------- wordlists
                 case '/api/wordlists': {
