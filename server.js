@@ -71,6 +71,7 @@ function makeEmitter(type) {
     return (event, data) => {
         const name = event.replace(PREFIX, '');
         if (name === 'progress' && task) task.progress = data;
+        if (type === 'adrecon' && name === 'log' && data && data.text) log('[adrecon] ' + String(data.text).slice(0, 300));
         broadcast(type + '_' + name, data);
         if (name === 'open' && type === 'scan') {
             (results.open = results.open || []).push(data);
@@ -317,6 +318,7 @@ const server = http.createServer(async (req, res) => {
                     if (task) { task.stopped = true; log('stopping ' + task.type); }
                     autoQueue.length = 0;
                     harvestQueue.length = 0;
+                    broadcast('task_state', { running: false, type: null, paused: false, stopped: true });
                     return send(res, 200, { ok: true });
 
                 // ---------------- results
