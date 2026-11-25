@@ -70,6 +70,7 @@ node tests/mock.test.js   # локальный FortiGate-мок: детект, �
 node tests/api.test.js    # smoke-тест REST API (нужен запущенный сервер на :7099)
 node tests/ui.test.js     # smoke-тест UI (DOM-заглушка, обработчики кнопок)
 node tests/adrecon.test.js # парсер VPN-конфигов и статус модуля ADRecon
+node tests/stop.test.js    # кнопка Stop: мгновенный SSE task_state
 ```
 
 ## Автор
@@ -172,6 +173,7 @@ node tests/mock.test.js   # local FortiGate mock: detect, brute, check, leak
 node tests/api.test.js    # REST API smoke test (server must run on :7099)
 node tests/ui.test.js     # UI runtime smoke test (DOM stub, inline handlers)
 node tests/adrecon.test.js # ADRecon config parser and module info
+node tests/stop.test.js    # Stop button: immediate SSE task_state
 ```
 
 ## Author
