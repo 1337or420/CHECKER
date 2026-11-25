@@ -5,5 +5,10 @@ data/geo.json
 data/found.json
 data/found_creds.txt
 data/sources/
+adrecon/adrecon.exe
+adrecon/input_vpn.txt
+adrecon/reports/
+adrecon/processed_configs.txt
+adrecon/failed_configs.txt
 node_modules/
 *.log
