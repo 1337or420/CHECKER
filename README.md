@@ -66,6 +66,7 @@ start.bat          # или: node server.js
 ```
 node tests/mock.test.js   # локальный FortiGate-мок: детект, брут, чек, слив кред
 node tests/api.test.js    # smoke-тест REST API (нужен запущенный сервер на :7099)
+node tests/ui.test.js     # smoke-тест UI (DOM-заглушка, обработчики кнопок)
 ```
 
 ## Автор
