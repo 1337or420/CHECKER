@@ -5,7 +5,7 @@ const https = require('https');
 const http = require('http');
 const dns = require('dns').promises;
 const store = require('./store');
-const { isIp, limiter } = require('./http');
+const { isIp, limiter, clearDns } = require('./http');
 
 const cache = store.load('geo.json', {});
 let dirty = false;
@@ -39,9 +39,9 @@ function scheduleSave() {
     saveTimer.unref && saveTimer.unref();
 }
 
-function norm(cc, country) {
+function norm(cc, country, source = '') {
     const c = String(cc || '').toUpperCase().slice(0, 2);
-    return { cc: c, country: String(country || '').slice(0, 64) };
+    return { cc: c, country: String(country || '').slice(0, 64), source };
 }
 
 function remember(key, info) {
@@ -52,7 +52,7 @@ function remember(key, info) {
 
 function known(key) {
     const hit = cache[key];
-    if (hit) return { cc: hit.cc || '', country: hit.country || '', flag: flag(hit.cc) };
+    if (hit) return { cc: hit.cc || '', country: hit.country || '', source: hit.source || 'cache', flag: flag(hit.cc) };
     return null;
 }
 
@@ -101,17 +101,17 @@ async function lookupIp(ip) {
     const providers = [
         async () => {
             const r = await fetchJson(`https://ipwho.is/${ip}?fields=success,country,country_code`);
-            if (r && r.success && r.country_code) return norm(r.country_code, r.country);
+            if (r && r.success && r.country_code) return norm(r.country_code, r.country, 'ipwho.is');
             return null;
         },
         async () => {
             const r = await fetchJson(`http://ip-api.com/json/${ip}?fields=status,country,countryCode`);
-            if (r && r.status === 'success') return norm(r.countryCode, r.country);
+            if (r && r.status === 'success') return norm(r.countryCode, r.country, 'ip-api.com');
             return null;
         },
         async () => {
             const r = await fetchJson(`https://ipapi.co/${ip}/json/`);
-            if (r && r.country_code) return norm(r.country_code, r.country_name);
+            if (r && r.country_code) return norm(r.country_code, r.country_name, 'ipapi.co');
             return null;
         },
     ];
@@ -119,7 +119,19 @@ async function lookupIp(ip) {
         const info = await p();
         if (info) return remember(ip, info);
     }
-    return remember(ip, { cc: '', country: 'unknown' });
+    return remember(ip, { cc: '', country: 'unknown', source: 'none' });
+}
+
+async function refresh(hosts) {
+    for (const h of hosts || []) {
+        const key = String(h || '').trim();
+        if (!key) continue;
+        delete cache[key];
+        if (cache['dns:' + key]) { delete cache[cache['dns:' + key].ip]; delete cache['dns:' + key]; }
+        clearDns(key);
+    }
+    store.save('geo.json', cache);
+    return lookup(hosts);
 }
 
 // hot path used by the scanner: cached, queued, never throws
@@ -155,4 +167,4 @@ function stats() {
     return { hosts: keys.length, countries: new Set(keys.map(k => cache[k].cc).filter(Boolean)).size };
 }
 
-module.exports = { lookup, queued, lookupIp, flag, stats, privateKind, cache };
+module.exports = { lookup, queued, lookupIp, flag, stats, privateKind, cache, refresh };
