@@ -2,6 +2,7 @@
 // temp: local FortiGate mock to validate the whole cred pipeline offline
 const http = require('http');
 const assert = require('assert');
+const store = require('../core/store');
 
 const hits = [];
 
@@ -90,6 +91,7 @@ server.listen(18080, '127.0.0.1', async () => {
         assert.ok(ex.leaked >= 1, 'expected leaked cred');
 
         console.log('\nALL OK');
+        store.flush();
         process.exit(0);
     } catch (e) {
         console.error('FAIL', e.message);
