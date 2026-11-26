@@ -6,6 +6,7 @@
 const net = require('net');
 const { parseRanges, rangesTotal, intToIp, isIp, cachedLookup } = require('./http');
 const { edgeHosts } = require('./scanner');
+const stackfp = require('./fingerprint');
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 function clamp(n, min, max) { n = parseInt(n, 10); if (isNaN(n)) n = min; return Math.max(min, Math.min(max, n)); }
@@ -116,7 +117,22 @@ async function run(task, emit) {
             done++;
             if (ok) {
                 live++;
-                const rec = { host, ip, port, url: `${/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(host) ? 'https://' + host : 'https://' + ip}:${port}`, ms: Date.now() - started, time: new Date().toISOString() };
+                const url = `${/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(host) ? 'https://' + host : 'https://' + ip}:${port}`;
+                const fp = task.fingerprint === false ? {} : await stackfp.probe(url, { timeout: Math.min(timeout, 2500) }).catch(() => ({}));
+                const rec = {
+                    host, ip, port, url,
+                    status: fp.status || null,
+                    title: fp.title || null,
+                    server: fp.server || '',
+                    product: fp.product || null,
+                    tech: fp.tech || [],
+                    lang: fp.lang || null,
+                    panels: fp.panels || [],
+                    generator: fp.generator || null,
+                    ms: Date.now() - started,
+                    time: new Date().toISOString(),
+                };
+                rec.line = `${host}:${port} ${rec.title || ''} | ${rec.product || 'unknown'} | ${rec.lang || rec.tech.join(',') || ''}`;
                 open++;
                 emit('fastscan_open', rec);
             } else failed++;
