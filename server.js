@@ -18,6 +18,7 @@ const settings = require('./core/settings');
 const wordlists = require('./core/wordlists');
 const httpc = require('./core/http');
 const adrecon = require('./core/adrecon');
+const fastscan = require('./core/fastscan');
 const { PRESETS, EXPLOITS } = require('./core/signatures');
 
 const PORT = parseInt(process.env.PORT || '7000', 10);
@@ -26,8 +27,8 @@ const PUBLIC = path.join(__dirname, 'public');
 const VERSION = '2.0.0';
 const MAX_RESULTS = 100000;
 
-const RESULT_KEYS = ['scan', 'brute', 'check', 'exploit', 'open', 'adrecon', 'events'];
-const results = store.load('results.json', { scan: [], brute: [], check: [], exploit: [], open: [], adrecon: [], events: [] });
+const RESULT_KEYS = ['scan', 'brute', 'check', 'exploit', 'open', 'adrecon', 'fastscan', 'events'];
+const results = store.load('results.json', { scan: [], brute: [], check: [], exploit: [], open: [], adrecon: [], fastscan: [], events: [] });
 for (const k of RESULT_KEYS) if (!Array.isArray(results[k])) results[k] = [];
 const logs = [];
 const clients = new Set();
@@ -66,7 +67,7 @@ function persistSoon() {
     saveTimer.unref && saveTimer.unref();
 }
 
-const PREFIX = /^(scan|brute|check|exploit|adrecon)_/;
+const PREFIX = /^(scan|brute|check|exploit|adrecon|fastscan)_/;
 let lastScanLog = 0;
 
 function makeEmitter(type) {
@@ -81,6 +82,10 @@ function makeEmitter(type) {
         broadcast(type + '_' + name, data);
         if (name === 'open' && type === 'scan') {
             (results.open = results.open || []).push(data);
+            persistSoon();
+        }
+        if (name === 'open' && type === 'fastscan') {
+            (results.fastscan = results.fastscan || []).push(data);
             persistSoon();
         }
         if (name === 'hit' || name === 'cred') {
@@ -128,6 +133,7 @@ const RUNNERS = {
     exploit: exploiter.exploitTask,
     harvest: exploiter.harvestTask,
     adrecon: adrecon.runTask,
+    fastscan: fastscan.run,
 };
 
 function startTask(type, params, isAuto) {
@@ -263,7 +269,7 @@ const server = http.createServer(async (req, res) => {
                         progress: task ? task.progress || null : null,
                         queues: { brute: autoQueue.length, harvest: harvestQueue.length },
                         targets: targets.count(), autoQueue: autoQueue.length,
-                        counts: { scan: results.scan.length, brute: results.brute.length, check: results.check.length, exploit: results.exploit.length, open: (results.open || []).length, adrecon: (results.adrecon || []).length },
+                        counts: { scan: results.scan.length, brute: results.brute.length, check: results.check.length, exploit: results.exploit.length, open: (results.open || []).length, adrecon: (results.adrecon || []).length, fastscan: (results.fastscan || []).length },
                         found: store.readText('found_creds.txt').split('\n').filter(Boolean).length,
                         proxy: httpc.proxyStats().count, geo: geo.stats(),
                         logs: logs.slice(-200),
@@ -289,7 +295,16 @@ const server = http.createServer(async (req, res) => {
                 // ---------------- tasks
                 case '/api/start': {
                     const type = body.type;
-                    if (!['scan', 'brute', 'check', 'exploit', 'harvest', 'adrecon'].includes(type)) return send(res, 400, { error: 'bad type' });
+                    if (!['scan', 'brute', 'check', 'exploit', 'harvest', 'adrecon', 'fastscan'].includes(type)) return send(res, 400, { error: 'bad type' });
+                    if (type === 'fastscan') {
+                        const parsed = httpc.parseRanges(body.ranges || '');
+                        if (!parsed.length) return send(res, 400, { error: 'no hosts' });
+                        return send(res, 200, startTask('fastscan', {
+                            ranges: body.ranges, ports: body.ports || [443],
+                            threads: body.threads || 2000, timeout: body.timeout || 800,
+                            limit: body.limit || 200000, strategy: body.strategy || 'edge',
+                        }));
+                    }
                     if (type === 'adrecon') {
                         return send(res, 200, startTask('adrecon', {
                             workers: body.workers || 5, queue: body.queue || 5, hours: body.hours || 3,
@@ -364,7 +379,14 @@ const server = http.createServer(async (req, res) => {
                         return send(res, 200, { ok: true });
                     }
                     const mode = u.searchParams.get('format');
-                    const all = store.load('found.json', []);
+                    let all = store.load('found.json', []);
+                    // older runs wrote only the text file (e.g. abrupt exit)
+                    if (!all.length) {
+                        all = store.readText('found_creds.txt').split(/\r?\n/).map(s => s.trim()).filter(Boolean).map(line => {
+                            const p = line.split(':');
+                            return { url: p[0] || '', username: p[1] || '', password: p.slice(2).join(':'), line };
+                        });
+                    }
                     if (mode === 'txt') return sendText(res, 'found_creds.txt', all.map(r => `${r.url}:${r.username}:${r.password}`).join('\r\n'));
                     if (mode === 'csv') {
                         const rows = [['url', 'username', 'password', 'cookie', 'verify', 'product', 'time']];
