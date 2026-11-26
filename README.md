@@ -71,6 +71,7 @@ node tests/api.test.js    # smoke-тест REST API (нужен запущенн
 node tests/ui.test.js     # smoke-тест UI (DOM-заглушка, обработчики кнопок)
 node tests/adrecon.test.js # парсер VPN-конфигов и статус модуля ADRecon
 node tests/stop.test.js    # кнопка Stop: мгновенный SSE task_state
+node tests/scan.test.js    # CIDR-скан: прогресс и завершение задачи
 ```
 
 ## Автор
@@ -174,6 +175,7 @@ node tests/api.test.js    # REST API smoke test (server must run on :7099)
 node tests/ui.test.js     # UI runtime smoke test (DOM stub, inline handlers)
 node tests/adrecon.test.js # ADRecon config parser and module info
 node tests/stop.test.js    # Stop button: immediate SSE task_state
+node tests/scan.test.js    # CIDR scan: progress events and completion
 ```
 
 ## Author
