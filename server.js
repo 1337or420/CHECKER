@@ -204,6 +204,8 @@ function send(res, code, obj) {
     res.end(body);
 }
 
+function escHtml(s) { return String(s ?? '').replace(/[<>&"]/g, ch => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[ch])); }
+
 function sendText(res, fileName, text, type) {
     res.writeHead(200, {
         'Content-Type': type || 'text/plain; charset=utf-8',
@@ -362,14 +364,47 @@ const server = http.createServer(async (req, res) => {
                     });
                 case '/api/results/text': {
                     const type = u.searchParams.get('type') || 'scan';
-                    const text = store.readResults(type);
-                    return sendText(res, `results_${type}.txt`, text || '(пусто)');
+                    const file = u.searchParams.get('file');
+                    let text = store.readResults(type);
+                    if (file) {
+                        const safeType = String(type).replace(/[^a-z0-9_-]/gi, '');
+                        const safeFile = path.basename(String(file));
+                        try { text = fs.readFileSync(path.join(store.RESULTS_DIR, safeType, safeFile), 'utf8'); }
+                        catch (e) { text = '(файл не найден)'; }
+                    }
+                    return sendText(res, `results_${type}${file ? '_' + file : ''}.txt`, text || '(пусто)');
+                }
+                case '/api/results/browse': {
+                    const cats = store.resultCategories();
+                    let html = `<!doctype html><meta charset="utf-8"><title>CHECKER — results</title>
+<style>body{background:#0d1117;color:#e6edf3;font:14px Consolas,monospace;padding:24px}
+a{color:#58a6ff}h2{color:#2ea043}.cat{margin:12px 0;border-left:3px solid #2ea043;padding-left:10px}</style>
+<h2>data/results/</h2><p>${escHtml(store.RESULTS_DIR)}</p>`;
+                    if (!cats.length) html += '<p class="text-muted">Папки пока пусты — запустите задачу.</p>';
+                    for (const c of cats) {
+                        html += `<div class="cat"><b>${escHtml(c.type)}/</b>`;
+                        for (const f of c.files) {
+                            html += `<div>· <a href="/api/results/text?type=${encodeURIComponent(c.type)}&file=${encodeURIComponent(f.name)}">${escHtml(f.name)}</a>
+                                — ${f.lines} строк, ${f.size} байт · <a href="/api/export?type=${encodeURIComponent(c.type === 'fastscan' ? 'fastscan' : c.type)}&format=txt">download</a></div>`;
+                        }
+                        html += '</div>';
+                    }
+                    html += '<p><a href="/">← вернуться в панель</a></p>';
+                    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+                    return res.end(html);
                 }
                 case '/api/results/open-folder': {
                     try {
                         const p = store.RESULTS_DIR;
-                        if (process.platform === 'win32') spawn('explorer.exe', [p], { windowsHide: true, detached: true });
-                        return send(res, 200, { ok: true, path: p });
+                        let opened = false;
+                        if (process.platform === 'win32') {
+                            try { spawn('explorer.exe', [p], { windowsHide: false, detached: true }); opened = true; }
+                            catch (e) {
+                                try { spawn('cmd.exe', ['/c', 'start', '', `"${p}"`], { windowsHide: false, detached: true }); opened = true; }
+                                catch (e2) { /* ignore */ }
+                            }
+                        }
+                        return send(res, 200, { ok: true, opened, path: p });
                     } catch (e) { return send(res, 500, { error: e.message }); }
                 }
                 case '/api/results/clear':
@@ -479,6 +514,16 @@ const server = http.createServer(async (req, res) => {
                     }).filter(Boolean);
                     const info = await geo.lookup(hosts);
                     log(`geo: ${Object.keys(info).length} hosts`);
+                    return send(res, 200, { ok: true, geo: info });
+                }
+
+                case '/api/geo/refresh': {
+                    const hosts = (body.urls || []).map(x => {
+                        try { return new URL(/^https?:\/\//i.test(x) ? x : 'https://' + x).hostname; }
+                        catch (e) { return String(x || '').trim() || null; }
+                    }).filter(Boolean);
+                    const info = await geo.refresh(hosts);
+                    log(`geo: перепроверено ${Object.keys(info).length} хостов`);
                     return send(res, 200, { ok: true, geo: info });
                 }
 
