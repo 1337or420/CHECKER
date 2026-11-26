@@ -4,6 +4,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const { spawn } = require('child_process');
 const { URL } = require('url');
 
 const store = require('./core/store');
@@ -82,14 +83,17 @@ function makeEmitter(type) {
         broadcast(type + '_' + name, data);
         if (name === 'open' && type === 'scan') {
             (results.open = results.open || []).push(data);
+            store.appendResult('open', data.line || `${data.host}:${data.port}`);
             persistSoon();
         }
         if (name === 'open' && type === 'fastscan') {
             (results.fastscan = results.fastscan || []).push(data);
+            store.appendResult('fastscan', `${data.host || data.ip}:${data.port}`);
             persistSoon();
         }
         if (name === 'hit' || name === 'cred') {
             (results[type] = results[type] || []).push(data);
+            store.appendResult(type, data.line || `${data.url || ''}:${data.username || ''}:${data.password || ''}`);
             persistSoon();
         }
         // Always keep a summary, even when a task found nothing — otherwise
@@ -97,6 +101,7 @@ function makeEmitter(type) {
         if (name === 'done') {
             results.events.push({ type, ...(data || {}), time: new Date().toISOString() });
             if (results.events.length > MAX_RESULTS) results.events = results.events.slice(-MAX_RESULTS);
+            store.appendResult('events', `[${new Date().toISOString()}] ${type}: ${JSON.stringify(data || {})}`);
             persistSoon();
         }
         if (name === 'hit' && type === 'scan') maybeAutoBrute(data);
@@ -351,23 +356,42 @@ const server = http.createServer(async (req, res) => {
 
                 // ---------------- results
                 case '/api/results':
-                    return send(res, 200, { ok: true, results, logs: logs.slice(-200) });
+                    return send(res, 200, {
+                        ok: true, results, logs: logs.slice(-200),
+                        files: store.resultCategories(), dir: store.RESULTS_DIR,
+                    });
+                case '/api/results/text': {
+                    const type = u.searchParams.get('type') || 'scan';
+                    const text = store.readResults(type);
+                    return sendText(res, `results_${type}.txt`, text || '(пусто)');
+                }
+                case '/api/results/open-folder': {
+                    try {
+                        const p = store.RESULTS_DIR;
+                        if (process.platform === 'win32') spawn('explorer.exe', [p], { windowsHide: true, detached: true });
+                        return send(res, 200, { ok: true, path: p });
+                    } catch (e) { return send(res, 500, { error: e.message }); }
+                }
                 case '/api/results/clear':
                     for (const k of Object.keys(results)) results[k] = [];
+                    store.clearResults();
                     store.save('results.json', results, false);
-                    log('results cleared');
+                    log('results cleared (including text files)');
                     return send(res, 200, { ok: true });
                 case '/api/export': {
                     const type = u.searchParams.get('type') || 'brute';
                     const format = u.searchParams.get('format') || 'txt';
                     const list = results[type] || [];
-                    if (format === 'json') return sendText(res, `checker_${type}.json`, JSON.stringify(list, null, 2), 'application/json');
+                    const textFiles = store.readResults(type);
+                    if (format === 'json') return sendText(res, `checker_${type}.json`, JSON.stringify(list.length ? list : textFiles, null, 2), 'application/json');
                     if (format === 'csv') {
                         const rows = [['url', 'username', 'password', 'cookie', 'verify', 'product', 'time']];
                         for (const r of list) rows.push([r.url, r.username, r.password, r.cookie, r.verify, r.product, r.time].map(v => `"${String(v ?? '').replace(/"/g, '""')}"`));
                         return sendText(res, `checker_${type}.csv`, rows.map(r => r.join(',')).join('\r\n'), 'text/csv; charset=utf-8');
                     }
-                    const text = list.map(r => r.line || `${String(r.url || '').replace(/^https?:\/\//, '')}:${r.username || ''}:${r.password || ''}`).join('\r\n');
+                    const text = list.length
+                        ? list.map(r => r.line || `${String(r.url || '').replace(/^https?:\/\//, '')}:${r.username || ''}:${r.password || ''}`).join('\r\n')
+                        : textFiles;
                     return sendText(res, `checker_${type}.txt`, text);
                 }
 
