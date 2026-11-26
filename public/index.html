@@ -410,17 +410,22 @@
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <h6 class="mb-0"><i class="bi bi-table me-1"></i>Все результаты</h6>
                     <div>
+                        <button class="btn btn-sm btn-outline-info" onclick="openResultsFolder()"><i class="bi bi-folder2-open me-1"></i>Папка результатов</button>
                         <button class="btn btn-sm btn-outline-success" onclick="exportResults('txt')"><i class="bi bi-download me-1"></i>TXT</button>
                         <button class="btn btn-sm btn-outline-success" onclick="exportResults('csv')"><i class="bi bi-download me-1"></i>CSV</button>
                         <button class="btn btn-sm btn-outline-success" onclick="exportResults('json')"><i class="bi bi-download me-1"></i>JSON</button>
                         <button class="btn btn-sm btn-outline-danger" onclick="clearResults()"><i class="bi bi-trash me-1"></i>Очистить</button>
                     </div>
                 </div>
+                <div class="small text-muted mb-2" id="resultsPath">data/results/…</div>
                 <ul class="nav nav-pills mb-2" id="resultTabs">
                     <li class="nav-item"><a class="nav-link active res-tab" data-tab="scan" href="#">Scan</a></li>
+                    <li class="nav-item"><a class="nav-link res-tab" data-tab="fastscan" href="#">FastScan</a></li>
                     <li class="nav-item"><a class="nav-link res-tab" data-tab="brute" href="#">Brute</a></li>
                     <li class="nav-item"><a class="nav-link res-tab" data-tab="check" href="#">Check</a></li>
                     <li class="nav-item"><a class="nav-link res-tab" data-tab="exploit" href="#">Exploit</a></li>
+                    <li class="nav-item"><a class="nav-link res-tab" data-tab="adrecon" href="#">ADRecon</a></li>
+                    <li class="nav-item"><a class="nav-link res-tab" data-tab="events" href="#">Events</a></li>
                 </ul>
                 <textarea id="resultsBox" class="form-control log-box" rows="18" readonly></textarea>
             </div>
