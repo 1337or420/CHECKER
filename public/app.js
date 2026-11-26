@@ -48,13 +48,27 @@ es.addEventListener('check_hit', e => addLive('checkResults', fmtCred(JSON.parse
 es.addEventListener('check_target', e => addLive('checkResults', fmtTarget(JSON.parse(e.data))));
 es.addEventListener('exploit_result', e => addLive('exploitResults', fmtExploit(JSON.parse(e.data))));
 es.addEventListener('exploit_cred', e => { addLive('exploitResults', fmtCred(JSON.parse(e.data))); });
+es.addEventListener('fastscan_start', e => appendLog('[fastscan] старт: ' + JSON.stringify(JSON.parse(e.data))));
+es.addEventListener('fastscan_progress', e => setProgress(JSON.parse(e.data)));
+es.addEventListener('fastscan_open', e => { const d = JSON.parse(e.data); addLive('fastscanResults', `<span class="tag">[OPEN]</span><span class="mono">${esc(d.ip || d.host)}:${esc(d.port)}</span><span class="t">${d.ms}мс · ${esc(d.host)}</span>`); bump('fastscanFound'); });
+es.addEventListener('fastscan_done', e => appendLog('[fastscan] завершён: ' + JSON.stringify(JSON.parse(e.data))));
 es.addEventListener('adrecon_log', e => { const d = JSON.parse(e.data); addLive('adreconLog', `<span class="mono">${esc(d.text)}</span>`); appendLog('[adrecon] ' + d.text); });
 es.addEventListener('adrecon_progress', e => setProgress(JSON.parse(e.data)));
 es.addEventListener('adrecon_hit', e => { const d = JSON.parse(e.data); addLive('adreconResults', `<span class="tag">[REPORT]</span><span class="mono">${esc(d.file)}</span><span class="t">${esc(JSON.stringify(d.summary || {}).slice(0, 120))}</span>`); bump('adReports'); });
 es.addEventListener('adrecon_start', e => appendLog('[adrecon] запуск: ' + JSON.stringify(JSON.parse(e.data))));
 es.addEventListener('adrecon_done', e => appendLog('[adrecon] завершено: ' + JSON.stringify(JSON.parse(e.data))));
 es.addEventListener('task_state', e => updateState(JSON.parse(e.data)));
-es.addEventListener('task_done', e => { updateState({ running: false }); loadResults(); refreshStats(); });
+es.addEventListener('task_done', e => {
+    const d = JSON.parse(e.data);
+    updateState({ running: false });
+    const r = d.result || {};
+    const total = r.total || r.tried || 1;
+    const done = r.scanned || r.tried || total;
+    setProgress({ done, total, found: r.found ?? r.valid ?? r.leaked, rate: r.elapsed ? done / (r.elapsed / 1000) : undefined });
+    const gl = $('gpLabel');
+    if (gl) gl.textContent = `DONE: ${d.type}`;
+    loadFound(); loadResults(); refreshStats();
+});
 
 function bump(id) { const el = $(id); if (el) el.textContent = String((parseInt(el.textContent, 10) || 0) + 1); }
 
@@ -136,6 +150,26 @@ async function refreshStats() {
     $('statBrute').textContent = s.counts ? s.counts.brute : 0;
     $('statCheck').textContent = s.counts ? s.counts.check : 0;
     $('statExploit').textContent = s.counts ? s.counts.exploit : 0;
+    loadFound();
+}
+
+// ---------------- found creds ----------------
+async function loadFound() {
+    const r = await api('found');
+    const list = r.found || [];
+    const cnt = $('foundCount');
+    if (cnt) cnt.textContent = String(list.length);
+    const box = $('foundList');
+    if (!box) return;
+    box.innerHTML = '';
+    if (!list.length) { box.innerHTML = '<div class="live-item text-muted">— пока нет —</div>'; return; }
+    for (const x of list.slice().reverse().slice(0, 100)) {
+        const div = document.createElement('div');
+        div.className = 'live-item';
+        const line = x.line || `${String(x.url || '').replace(/^https?:\/\//, '')}:${x.username || ''}:${x.password || ''}`;
+        div.innerHTML = `<span class="tag">[FOUND]</span><span class="mono cred" data-copy="${esc(line)}">${esc(line)}</span><span class="t">${x.product ? esc(x.product) : ''}</span>`;
+        box.appendChild(div);
+    }
 }
 
 function updateState(st) {
@@ -208,9 +242,28 @@ function download(name, text, type = 'text/plain') {
 }
 
 // ---------------- task starters ----------------
-function startCurrent() {
+// ---------------- FastScan ----------------
+async function startFastscan() {
+    const r = await api('start', {
+        method: 'POST',
+        body: {
+            type: 'fastscan',
+            ranges: $('fsRanges').value,
+            ports: $('fsPorts').value.split(/[\s,;]+/).map(Number).filter(Boolean),
+            threads: +$('fsThreads').value,
+            timeout: +$('fsTimeout').value,
+            limit: +$('fsLimit').value,
+            strategy: $('fsStrategy').value,
+        },
+    });
+    if (r.error) return alert(r.error);
+    switchTab('tab-fastscan');
+}
+
+async function startCurrent() {
     if ($('bruteUsers').value.trim() || $('brutePasses').value.trim()) startBrute();
     else if ($('scanRanges').value.trim()) startScan();
+    else if ($('fsRanges').value.trim()) startFastscan();
     else startExploit();
 }
 
