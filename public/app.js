@@ -51,7 +51,8 @@ es.addEventListener('exploit_result', e => addLive('exploitResults', fmtExploit(
 es.addEventListener('exploit_cred', e => { addLive('exploitResults', fmtCred(JSON.parse(e.data))); });
 es.addEventListener('fastscan_start', e => appendLog('[fastscan] старт: ' + JSON.stringify(JSON.parse(e.data))));
 es.addEventListener('fastscan_progress', e => setProgress(JSON.parse(e.data)));
-es.addEventListener('fastscan_open', e => { const d = JSON.parse(e.data); addLive('fastscanResults', `<span class="tag">[OPEN]</span><span class="mono">${esc(d.ip || d.host)}:${esc(d.port)}</span><span class="t">${d.ms}мс · ${esc(d.host)}</span>`); bump('fastscanFound'); });
+es.addEventListener('fastscan_open', e => { const d = JSON.parse(e.data); addLive('fastscanResults', fmtOpen(d)); bump('fastscanFound'); });
+es.addEventListener('scan_open', e => { const d = JSON.parse(e.data); addLive('scanResults', fmtOpen(d)); });
 es.addEventListener('fastscan_done', e => appendLog('[fastscan] завершён: ' + JSON.stringify(JSON.parse(e.data))));
 es.addEventListener('adrecon_log', e => { const d = JSON.parse(e.data); addLive('adreconLog', `<span class="mono">${esc(d.text)}</span>`); appendLog('[adrecon] ' + d.text); });
 es.addEventListener('adrecon_progress', e => setProgress(JSON.parse(e.data)));
@@ -129,6 +130,12 @@ function fmtTarget(d) {
     const cls = d.alive ? 'tag' : 'text-danger';
     const extra = [d.product, d.version ? 'v' + d.version : null, d.hostname].filter(Boolean).join(' ');
     return `<span class="${cls}">[${d.alive ? 'ALIVE' : 'DEAD'}]</span><span class="mono">${esc(d.url)}</span><span class="t">${esc(extra)}</span>`;
+}
+
+function fmtOpen(d) {
+    const stack = [d.product, d.lang, ...(d.tech || [])].filter(Boolean).join(' / ');
+    return `<span class="tag">[OPEN]</span><span class="mono">${esc(d.ip || d.host)}:${esc(d.port)}</span>`
+        + `<span>${esc(d.title || '')}</span><span class="t">${esc(stack || d.server || '')}${d.ms ? ' · ' + d.ms + 'мс' : ''}</span>`;
 }
 
 function fmtExploit(d) {
