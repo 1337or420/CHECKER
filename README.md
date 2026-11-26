@@ -57,14 +57,14 @@ start.bat          # или: node server.js
 - `POST /api/start` `{type: scan|fastscan|brute|check|exploit|harvest|adrecon, ...}`
 - `POST /api/pause` / `POST /api/stop`
 - `GET  /api/results`, `POST /api/results/clear`
-- `GET  /api/results/text?type=brute`, `POST /api/results/open-folder`
+- `GET  /api/results/text?type=brute`, `GET /api/results/browse`, `POST /api/results/open-folder`
 - `GET  /api/export?type=brute&format=txt|csv|json`
 - `GET  /api/found[?format=txt|csv]`, `DELETE /api/found`
 - `GET/POST /api/settings` (прокси, RPS, параллельность, авто-брут)
 - `GET/POST /api/wordlists` (пользовательские словари)
 - `GET/POST /api/adrecon` (инфо, `build`, `import` VPN-конфигов); задача `type:'adrecon'`
 - `POST /api/exploits`, `GET /api/exploits`
-- `POST /api/geo`, `GET /api/sources`, `POST /api/sources`, `GET /api/sources/load?cc=`
+- `POST /api/geo`, `POST /api/geo/refresh`, `GET /api/sources`, `POST /api/sources`, `GET /api/sources/load?cc=`
 - `GET  /api/events` — SSE-поток событий
 
 ## Тесты
@@ -170,7 +170,7 @@ A successful login is detected via `ret=1` **and/or** `Set-Cookie: SVPNCOOKIE`, 
 - `POST /api/start` `{type: scan|fastscan|brute|check|exploit|harvest|adrecon, ...}`
 - `POST /api/pause`, `POST /api/stop`
 - `GET  /api/results`, `POST /api/results/clear`
-- `GET  /api/results/text?type=brute`, `POST /api/results/open-folder`
+- `GET  /api/results/text?type=brute`, `GET /api/results/browse`, `POST /api/results/open-folder`
 - `GET  /api/export?type=brute&format=txt|csv|json`
 - `GET  /api/found[?format=txt|csv]`, `DELETE /api/found`
 - `GET/POST /api/settings`, `GET/POST /api/wordlists`
