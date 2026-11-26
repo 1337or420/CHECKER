@@ -1,5 +1,16 @@
 'use strict';
-// temp: local FortiGate mock to validate the whole cred pipeline offline
+// local FortiGate mock: validate detect, brute, check and credential leak.
+// Uses an isolated data dir so test creds never pollute the real panel.
+const os = require('os');
+const path = require('path');
+const fs = require('fs');
+const testData = path.join(os.tmpdir(), 'checker-mock-data');
+fs.mkdirSync(testData, { recursive: true });
+for (const f of ['found.json', 'found_creds.txt']) {
+    try { fs.unlinkSync(path.join(testData, f)); } catch (e) { /* ignore */ }
+}
+process.env.CHECKER_DATA_DIR = testData;
+
 const http = require('http');
 const assert = require('assert');
 const store = require('../core/store');
