@@ -139,7 +139,7 @@ async function verifySession(url, cookie, opts = {}) {
 // Fingerprint a host: is it a FortiGate SSL-VPN portal, and which version?
 async function detect(url, opts = {}) {
     const base = baseOf(url);
-    const out = { forti: false, version: null, hostname: null, kind: null, paths: [] };
+    const out = { forti: false, version: null, hostname: null, kind: null, evidence: [] };
     const res = await request(base + LOGIN_PAGE, {
         timeout: opts.timeout || 8000,
         maxBody: 64 * 1024,
@@ -148,7 +148,11 @@ async function detect(url, opts = {}) {
     });
     if (!res.ok) { out.kind = 'dead'; out.error = res.error; return out; }
     const body = res.body || '';
-    if (FORTI_MARKERS.test(body) || /hostcheck_install|fgt_lang/i.test(body)) out.forti = true;
+    const serverHdr = String((res.headers && (res.headers.server || res.headers.Server)) || '');
+    const pageCookies = ((res.headers && res.headers['set-cookie']) || []).join(' ');
+    if (FORTI_MARKERS.test(body) || /hostcheck_install|fgt_lang/i.test(body)) { out.forti = true; out.evidence.push('brand'); }
+    if (/fortigate|fortinet|fortiweb/i.test(serverHdr)) { out.forti = true; out.evidence.push('server-header'); }
+    if (/SVPNCOOKIE/i.test(pageCookies)) { out.forti = true; out.evidence.push('login-cookie'); }
     if (/hostcheck_install\?auth_type/i.test(body)) out.kind = 'sslvpn';
     const title = body.match(/<title>([^<]{1,120})<\/title>/i);
     if (title) out.hostname = title[1].trim();
@@ -159,6 +163,7 @@ async function detect(url, opts = {}) {
     const xml = await request(base + PATHS.xml, { timeout: opts.timeout || 8000, maxBody: 32 * 1024, retries: 0, userAgent: opts.userAgent });
     if (xml.ok && xml.status === 200 && /<sslvpn_connection|<version|sslvpn/i.test(xml.body || '')) {
         out.forti = true;
+        out.evidence.push('xml');
         out.kind = out.kind || 'xml';
         if (!out.version) {
             const v = (xml.body || '').match(/<version>\s*([^<\s]+)/i) || (xml.body || '').match(/version="([^"]+)"/i);
@@ -167,7 +172,7 @@ async function detect(url, opts = {}) {
         const h = (xml.body || '').match(/<hostname>\s*([^<]+)\s*<\/hostname>/i);
         if (h && !out.hostname) out.hostname = h[1];
     }
-    if (!out.forti && /remote\/logincheck/i.test(body)) out.forti = true;
+    if (!out.forti && /remote\/logincheck/i.test(body)) { out.forti = true; out.evidence.push('login-form'); }
 
     // branded pages can be static decoys: always confirm with logincheck semantics
     {
@@ -181,12 +186,19 @@ async function detect(url, opts = {}) {
         });
         if (lc.ok && /(?:^|[,\s{"'])ret["']?\s*[:=]\s*["']?\d/i.test(lc.body || '')) {
             out.forti = true;
+            out.evidence.push('logincheck-ret');
             out.kind = out.kind || 'logincheck';
-        } else if (lc.ok && /<html|<!/i.test(lc.body || '') && !out.version && !/remote\/logincheck/i.test(body)) {
-            // static demo pages / honeypots with a FortiGate title but no
-            // working logincheck — do not waste credential attempts on them
+        } else if (lc.status >= 300 && lc.status < 400 && /\/remote\/(login|index)/i.test(String((lc.headers && lc.headers.location) || ''))) {
+            // FortiOS often redirects AJAX logincheck to the portal — strong signal
+            out.forti = true;
+            out.evidence.push('logincheck-redirect');
+            out.kind = out.kind || 'logincheck';
+        } else if (lc.ok && /<html|<!/i.test(lc.body || '') && !out.version
+            && !out.evidence.includes('login-form') && !out.evidence.includes('login-cookie')) {
+            // static demo page with FortiGate title and no logincheck semantics
             out.forti = false;
             out.kind = 'decoy';
+            out.evidence.push('decoy-html');
         }
     }
     return out;
