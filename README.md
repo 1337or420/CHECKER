@@ -41,6 +41,7 @@ start.bat          # или: node server.js
 | Модуль | Описание |
 |---|---|
 | **Сканер** | CIDR / диапазоны / мультипорт, TCP-пречек, 6 пресетов сигнатур, случайная или «edge» (/24 .1/.2/.3/.254) выборка, отсев декоев |
+| **FastScan** | Свой массовый TCP-сканер в духе masscan/rustscan: пул connect, DNS-кэш, до 32 портов, limiter и heartbeat |
 | **Брутфорс** | Режимы `smart` / `combo` / `cross`, потоки + лимит на хост + RPS, стоп после N валидных, дефолтные словари |
 | **Чекер** | Ревалидация пар и целей, статусы alive/dead/locked/2FA |
 | **Эксплоиты** | CVE-2018-13379 (слив кред), CVE-2022-40684, XML-сниффинг, версионные эвристики |
@@ -53,7 +54,7 @@ start.bat          # или: node server.js
 
 - `GET  /api/status` — состояние, счётчики, очередь
 - `GET/POST/DELETE /api/targets` — цели (добавление, удаление, очистка)
-- `POST /api/start` `{type: scan|brute|check|exploit|harvest, ...}`
+- `POST /api/start` `{type: scan|fastscan|brute|check|exploit|harvest|adrecon, ...}`
 - `POST /api/pause` / `POST /api/stop`
 - `GET  /api/results`, `POST /api/results/clear`
 - `GET  /api/export?type=brute&format=txt|csv|json`
@@ -74,6 +75,7 @@ node tests/ui.test.js     # smoke-тест UI (DOM-заглушка, обраб�
 node tests/adrecon.test.js # парсер VPN-конфигов и статус модуля ADRecon
 node tests/stop.test.js    # кнопка Stop: мгновенный SSE task_state
 node tests/scan.test.js    # CIDR-скан: прогресс и завершение задачи
+node tests/fastscan.test.js # быстрый TCP-сканер: открытый/закрытый порт
 ```
 
 ## Автор
@@ -97,7 +99,8 @@ Checker/
 │   ├── sources.js         # CIDR-базы
 │   ├── store.js           # атомарное JSON-хранилище
 │   ├── settings.js / targets.js / lines.js / checker.js
-│   └── adrecon.js          # обёртка над Go/Docker модулем
+│   ├── adrecon.js          # обёртка над Go/Docker модулем
+│   └── fastscan.js         # свой массовый TCP-сканер
 ├── adrecon/                # ADRecon (Go orchestrator + scripts)
 ├── public/                # панель
 ├── data/                  # targets, results, found, geo, settings, sources
@@ -149,6 +152,7 @@ A successful login is detected via `ret=1` **and/or** `Set-Cookie: SVPNCOOKIE`, 
 | Module | Description |
 |---|---|
 | **Scanner** | CIDR / ranges / multi-port, TCP pre-check, 6 signature presets, random or edge (/24 .1/.2/.3/.254) sampling, decoy filtering |
+| **FastScan** | Own mass TCP scanner in the spirit of masscan/rustscan: connect pool, DNS cache, up to 32 ports, limiter and heartbeat |
 | **Brute force** | `smart` / `combo` / `cross` modes, threads + per-host limit + RPS, stop after N hits, built-in wordlists |
 | **Checker** | Re-validation of pairs and targets, alive/dead/locked/2FA states |
 | **Exploits** | CVE-2018-13379 credential leak, CVE-2022-40684, XML recon, version heuristics |
@@ -161,7 +165,7 @@ A successful login is detected via `ret=1` **and/or** `Set-Cookie: SVPNCOOKIE`, 
 
 - `GET  /api/status`
 - `GET/POST/DELETE /api/targets`
-- `POST /api/start` `{type: scan|brute|check|exploit|harvest, ...}`
+- `POST /api/start` `{type: scan|fastscan|brute|check|exploit|harvest|adrecon, ...}`
 - `POST /api/pause`, `POST /api/stop`
 - `GET  /api/results`, `POST /api/results/clear`
 - `GET  /api/export?type=brute&format=txt|csv|json`
@@ -180,6 +184,7 @@ node tests/ui.test.js     # UI runtime smoke test (DOM stub, inline handlers)
 node tests/adrecon.test.js # ADRecon config parser and module info
 node tests/stop.test.js    # Stop button: immediate SSE task_state
 node tests/scan.test.js    # CIDR scan: progress events and completion
+node tests/fastscan.test.js # fast TCP scanner: open/closed port
 ```
 
 ## Author
