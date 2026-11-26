@@ -40,7 +40,7 @@ start.bat          # или: node server.js
 
 | Модуль | Описание |
 |---|---|
-| **Сканер** | CIDR / диапазоны / мультипорт, TCP-пречек, 6 пресетов сигнатур, случайная или «edge» (/24 .1/.2/.3/.254) выборка, отсев декоев |
+| **Сканер** | CIDR / диапазоны / мультипорт, TCP-пречек, 6 пресетов сигнатур, случайная или «edge» (/24 .1/.2/.3/.254) выборка, сохранение всех открытых портов, отсев только доказанных декоев |
 | **FastScan** | Свой массовый TCP-сканер в духе masscan/rustscan: пул connect, DNS-кэш, до 32 портов, limiter и heartbeat |
 | **Брутфорс** | Режимы `smart` / `combo` / `cross`, потоки + лимит на хост + RPS, стоп после N валидных, дефолтные словари |
 | **Чекер** | Ревалидация пар и целей, статусы alive/dead/locked/2FA |
@@ -153,7 +153,7 @@ A successful login is detected via `ret=1` **and/or** `Set-Cookie: SVPNCOOKIE`, 
 
 | Module | Description |
 |---|---|
-| **Scanner** | CIDR / ranges / multi-port, TCP pre-check, 6 signature presets, random or edge (/24 .1/.2/.3/.254) sampling, decoy filtering |
+| **Scanner** | CIDR / ranges / multi-port, TCP pre-check, 6 signature presets, random or edge (/24 .1/.2/.3/.254) sampling, all open ports saved, only proven decoys filtered out |
 | **FastScan** | Own mass TCP scanner in the spirit of masscan/rustscan: connect pool, DNS cache, up to 32 ports, limiter and heartbeat |
 | **Brute force** | `smart` / `combo` / `cross` modes, threads + per-host limit + RPS, stop after N hits, built-in wordlists |
 | **Checker** | Re-validation of pairs and targets, alive/dead/locked/2FA states |
