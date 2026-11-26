@@ -88,7 +88,7 @@ function makeEmitter(type) {
         }
         if (name === 'open' && type === 'fastscan') {
             (results.fastscan = results.fastscan || []).push(data);
-            store.appendResult('fastscan', `${data.host || data.ip}:${data.port}`);
+            store.appendResult('fastscan', data.line || `${data.host || data.ip}:${data.port}`);
             persistSoon();
         }
         if (name === 'hit' || name === 'cred') {
