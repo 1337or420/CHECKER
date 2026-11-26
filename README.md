@@ -2,7 +2,7 @@
 
 > **Автор:** 1337or420 Team · **Сайт:** [storona.shop](https://storona.shop)
 
-> ⚠️ **Предупреждение / Disclaimer:** Этот чекер сделан **исключительно для ознакомления** с разными видами брутфорс- и эксплоит-атак в автоматическом режиме. Проект создан при помощи ИИ. Не используйте его против чужих систем или сетей без явного письменного разрешения владельца. Автор не несёт ответственности за любое несанкционированное использование.
+> ⚠️ **Предупреждение / Disclaimer:** Этот чекер сделан **исключительно для ознакомления** с разными видами брутфорс- и эксплоит-атак в автоматическом режиме. Проект создан при помощи ИИ. Не используйте его против чужих систем или сетей без явного письменного разрешения владельца. **Автор не несёт никакой ответственности** за любые убытки, ущерб или юридические последствия, связанные с использованием либо несанкционированным использованием этого проекта.
 
 Веб-панель для сканирования, брутфорса и добычи учётных данных Fortinet / FortiGate SSL-VPN.
 Архитектура выросла из **VPN_Brute 1.2.0** (`vpn_server`): пресеты сигнатур (`*-param.json`), разделение фронт/ядро.
@@ -110,7 +110,7 @@ Checker/
 
 > **Author:** 1337or420 Team · **Website:** [storona.shop](https://storona.shop)
 
-> ⚠️ **Disclaimer:** This checker is made **for educational purposes only** — to study different kinds of brute-force and exploit attacks in automated mode. The project was created with the help of AI. Do not use it against systems or networks you do not own or have explicit written permission to test. The author is not responsible for any unauthorized use.
+> ⚠️ **Disclaimer:** This checker is made **for educational purposes only** — to study different kinds of brute-force and exploit attacks in automated mode. The project was created with the help of AI. Do not use it against systems or networks you do not own or have explicit written permission to test. **The author assumes no liability whatsoever** for any damages, losses or legal consequences arising from the use or unauthorized use of this project.
 
 Web control panel for scanning, brute-forcing and harvesting credentials from Fortinet / FortiGate SSL-VPN.
 Architecture is based on **VPN_Brute 1.2.0** (`vpn_server`): signature presets (`*-param.json`), separated core and frontend.
