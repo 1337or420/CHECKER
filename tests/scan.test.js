@@ -42,5 +42,9 @@ const timer = setTimeout(() => ac.abort(), 30000);
         if (!s.running && i > 1) break;
     }
     clearTimeout(timer); ac.abort(); await read.catch(() => {});
+    const results = await (await fetch(base + '/api/results')).json();
+    const summary = (results.results.events || []).filter(x => x.type === 'scan').pop();
+    if (!summary) throw new Error('scan summary not persisted');
     console.log('events', JSON.stringify(counts), 'last_progress', last);
+    console.log('SUMMARY STORED OK —', JSON.stringify(summary));
 })();
