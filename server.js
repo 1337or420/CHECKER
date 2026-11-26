@@ -66,12 +66,17 @@ function persistSoon() {
 }
 
 const PREFIX = /^(scan|brute|check|exploit|adrecon)_/;
+let lastScanLog = 0;
 
 function makeEmitter(type) {
     return (event, data) => {
         const name = event.replace(PREFIX, '');
         if (name === 'progress' && task) task.progress = data;
         if (type === 'adrecon' && name === 'log' && data && data.text) log('[adrecon] ' + String(data.text).slice(0, 300));
+        if (type === 'scan' && name === 'progress' && data && data.total && Date.now() - lastScanLog > 10000) {
+            lastScanLog = Date.now();
+            log(`[scan] ${data.done}/${data.total} найдено ${data.found}${data.rate !== undefined ? ` (${data.rate}/с)` : ''}`);
+        }
         broadcast(type + '_' + name, data);
         if (name === 'open' && type === 'scan') {
             (results.open = results.open || []).push(data);
