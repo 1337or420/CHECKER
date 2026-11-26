@@ -22,6 +22,16 @@
     </div>
 </nav>
 
+<div id="globalProgress" class="px-3 py-2 bg-panel border-bottom">
+    <div class="d-flex align-items-center gap-3">
+        <span id="gpLabel" class="small text-muted" style="min-width:90px">Idle</span>
+        <div class="progress flex-grow-1" style="height:18px;">
+            <div id="gpBar" class="progress-bar bg-success" style="width:0%">0%</div>
+        </div>
+        <span id="gpRate" class="small text-muted" style="min-width:110px;text-align:right"></span>
+    </div>
+</div>
+
 <div class="container-xxl mt-3">
     <ul class="nav nav-tabs panel-tabs" id="mainTabs" role="tablist">
         <li class="nav-item"><a class="nav-link active" data-tab="tab-dashboard" href="#"><i class="bi bi-speedometer2 me-1"></i>Панель</a></li>
