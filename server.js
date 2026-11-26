@@ -383,6 +383,9 @@ const server = http.createServer(async (req, res) => {
                     // older runs wrote only the text file (e.g. abrupt exit)
                     if (!all.length) {
                         all = store.readText('found_creds.txt').split(/\r?\n/).map(s => s.trim()).filter(Boolean).map(line => {
+                            // format: scheme://host:port:user:password (password may contain ':')
+                            const m = line.match(/^(https?:\/\/[^\s:]+(?::\d+)?):([^:\s]+):(.*)$/);
+                            if (m) return { url: m[1], username: m[2], password: m[3], product: 'legacy', line };
                             const p = line.split(':');
                             return { url: p[0] || '', username: p[1] || '', password: p.slice(2).join(':'), line };
                         });
