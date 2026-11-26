@@ -77,6 +77,7 @@ node tests/adrecon.test.js # парсер VPN-конфигов и статус �
 node tests/stop.test.js    # кнопка Stop: мгновенный SSE task_state
 node tests/scan.test.js    # CIDR-скан: прогресс и завершение задачи
 node tests/fastscan.test.js # быстрый TCP-сканер: открытый/закрытый порт
+node tests/websession.test.js # парсер sslvpn_websession (61-байтовые записи)
 node tests/results.test.js  # папки результатов по категориям, txt, очистка
 ```
 
@@ -188,6 +189,7 @@ node tests/adrecon.test.js # ADRecon config parser and module info
 node tests/stop.test.js    # Stop button: immediate SSE task_state
 node tests/scan.test.js    # CIDR scan: progress events and completion
 node tests/fastscan.test.js # fast TCP scanner: open/closed port
+node tests/websession.test.js # sslvpn_websession parser (61-byte records)
 node tests/results.test.js  # per-category result folders, txt, clear
 ```
 
