@@ -44,6 +44,10 @@ sandbox.globalThis = sandbox;
 vm.createContext(sandbox);
 try {
     new vm.Script(app, { filename: 'app.js' }).runInContext(sandbox);
+    // exercise top-level functions that depend on shared state
+    sandbox.setProgress({ done: 5, total: 10, found: 1, rate: 2 });
+    sandbox.updateState({ running: true, type: 'scan' });
+    sandbox.updateState({ running: false, stopped: true });
 } catch (e) {
     errors.push(e.message);
 }
