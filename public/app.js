@@ -16,6 +16,21 @@ async function api(path, opts = {}) {
 
 // ---------------- SSE ----------------
 const es = new EventSource('/api/events');
+let sseWasDown = false;
+es.onopen = () => {
+    const b = $('sseBadge');
+    if (b) { b.className = 'badge bg-success'; b.textContent = 'LIVE'; }
+    if (sseWasDown) {
+        sseWasDown = false;
+        appendLog('[sse] соединение восстановлено');
+        refreshStats(); loadResults();
+    }
+};
+es.onerror = () => {
+    sseWasDown = true;
+    const b = $('sseBadge');
+    if (b) { b.className = 'badge bg-danger'; b.textContent = 'SSE OFF'; }
+};
 es.addEventListener('hello', e => { $('versionBadge').textContent = 'v' + JSON.parse(e.data).version; });
 es.addEventListener('log', e => appendLog(JSON.parse(e.data).text));
 es.addEventListener('scan_hit', e => { addLive('scanResults', fmtScan(JSON.parse(e.data))); bump('scanFound'); });
@@ -304,8 +319,15 @@ let resultTab = 'scan';
 
 async function loadResults() {
     const r = await api('results');
-    const list = (r.results && r.results[resultTab]) || [];
-    $('resultsBox').value = list.map(x => x.line || JSON.stringify(x)).join('\n');
+    const all = r.results || {};
+    const list = all[resultTab] || [];
+    if (!list.length && resultTab === 'scan' && (all.events || []).length) {
+        const ev = all.events.filter(x => x.type === 'scan').slice(-50);
+        $('resultsBox').value = ev.map(x => JSON.stringify(x)).join('\n')
+            + '\n\n(находок нет — это сводки завершённых сканов)';
+    } else {
+        $('resultsBox').value = list.map(x => x.line || JSON.stringify(x)).join('\n');
+    }
     if (r.logs) { $('logBox').value = r.logs.join('\n') + '\n'; $('logBox').scrollTop = $('logBox').scrollHeight; }
 }
 
