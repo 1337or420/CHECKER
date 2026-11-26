@@ -36,6 +36,7 @@
     <ul class="nav nav-tabs panel-tabs" id="mainTabs" role="tablist">
         <li class="nav-item"><a class="nav-link active" data-tab="tab-dashboard" href="#"><i class="bi bi-speedometer2 me-1"></i>Панель</a></li>
         <li class="nav-item"><a class="nav-link" data-tab="tab-scanner" href="#"><i class="bi bi-radar me-1"></i>Сканер</a></li>
+        <li class="nav-item"><a class="nav-link" data-tab="tab-fastscan" href="#"><i class="bi bi-lightning-charge me-1"></i>Быстрый скан</a></li>
         <li class="nav-item"><a class="nav-link" data-tab="tab-brute" href="#"><i class="bi bi-key me-1"></i>Брутфорс</a></li>
         <li class="nav-item"><a class="nav-link" data-tab="tab-checker" href="#"><i class="bi bi-check2-square me-1"></i>Чекер</a></li>
         <li class="nav-item"><a class="nav-link" data-tab="tab-exploit" href="#"><i class="bi bi-bug me-1"></i>Эксплоиты</a></li>
@@ -55,6 +56,13 @@
                 <div class="col-6 col-md-2"><div class="stat-card"><div class="stat-num" id="statCheck">0</div><div class="stat-label">Валид (чек)</div></div></div>
                 <div class="col-6 col-md-2"><div class="stat-card"><div class="stat-num" id="statExploit">0</div><div class="stat-label">Уязвимости</div></div></div>
                 <div class="col-6 col-md-2"><div class="stat-card"><div class="stat-num" id="statQueue">0</div><div class="stat-label">Очередь</div></div></div>
+            </div>
+            <div class="card-box mt-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="mb-0"><i class="bi bi-key me-1"></i>Найденные креды <span class="badge bg-success" id="foundCount">0</span></h6>
+                    <button class="btn btn-sm btn-outline-success" onclick="exportFound('txt')"><i class="bi bi-download me-1"></i>TXT</button>
+                </div>
+                <div class="live-list" id="foundList" style="max-height:180px"></div>
             </div>
             <div class="row g-3 mt-1">
                 <div class="col-md-4">
@@ -142,6 +150,41 @@
                     <div class="card-box">
                         <h6><i class="bi bi-broadcast me-1"></i>Найденные цели <span class="badge bg-success" id="scanFound">0</span></h6>
                         <div class="live-list" id="scanResults"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ FASTSCAN ============ -->
+        <div class="tab-pane fade" id="tab-fastscan">
+            <div class="row g-3">
+                <div class="col-md-5">
+                    <div class="card-box">
+                        <h6><i class="bi bi-lightning-charge me-1"></i>FastScan (аналог masscan/rustscan)</h6>
+                        <p class="small text-muted">Свой TCP-сканер: пул параллельных connect, DNS-кэш, выборка адресов шлюзов /24. Быстро отсекает мёртвые хосты.</p>
+                        <label class="form-label mt-2">Диапазоны / CIDR</label>
+                        <textarea id="fsRanges" class="form-control mono" rows="7" placeholder="192.168.1.0/24&#10;10.0.0.1-10.0.0.50&#10;example.com"></textarea>
+                        <div class="row g-2 mt-2">
+                            <div class="col-4"><label class="form-label">Порты</label><input id="fsPorts" class="form-control" value="443,10443,8443"></div>
+                            <div class="col-4"><label class="form-label">Потоки</label><input id="fsThreads" class="form-control" value="2000"></div>
+                            <div class="col-4"><label class="form-label">Таймаут, мс</label><input id="fsTimeout" class="form-control" value="800"></div>
+                        </div>
+                        <div class="row g-2 mt-2">
+                            <div class="col-6"><label class="form-label">Лимит проверок</label><input id="fsLimit" class="form-control" value="200000"></div>
+                            <div class="col-6"><label class="form-label">Стратегия</label>
+                                <select id="fsStrategy" class="form-select">
+                                    <option value="edge">Шлюзы /24</option>
+                                    <option value="random">Случайные IP</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button class="btn btn-success w-100 mt-3" onclick="startFastscan()"><i class="bi bi-play-fill me-1"></i>Быстрый скан портов</button>
+                    </div>
+                </div>
+                <div class="col-md-7">
+                    <div class="card-box">
+                        <h6><i class="bi bi-broadcast me-1"></i>Открытые порты <span class="badge bg-success" id="fastscanFound">0</span></h6>
+                        <div class="live-list" id="fastscanResults"></div>
                     </div>
                 </div>
             </div>
