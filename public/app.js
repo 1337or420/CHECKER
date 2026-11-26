@@ -87,7 +87,11 @@ function setProgress(d) {
     if (gl) gl.textContent = `${(currentTaskType || 'task').toUpperCase()}${d.found !== undefined ? ` · found ${d.found}` : ''}`;
     const gr = $('gpRate');
     if (gr) gr.textContent = d.rate ? `${Number(d.rate).toFixed(1)}/с` : '';
-    $('rateInfo').textContent = d.rate ? `${Number(d.rate).toFixed(1)} проверок/с` : '';
+    const extra = [];
+    if (d.alive !== undefined) extra.push('alive ' + d.alive);
+    if (d.dead !== undefined) extra.push('dead ' + d.dead);
+    if (d.skipped !== undefined) extra.push('skip ' + d.skipped);
+    $('rateInfo').textContent = `${d.rate ? Number(d.rate).toFixed(1) + ' проверок/с' : ''}${extra.length ? ' · ' + extra.join(' · ') : ''}`;
 }
 
 function appendLog(text) {
@@ -400,6 +404,15 @@ async function loadResults() {
     if (r.logs) { $('logBox').value = r.logs.join('\n') + '\n'; $('logBox').scrollTop = $('logBox').scrollHeight; }
 }
 
+function browseResults() { window.open('/api/results/browse', '_blank'); }
+
+async function copyResultsPath() {
+    const r = await api('results');
+    const p = r.dir || 'data/results';
+    try { await navigator.clipboard.writeText(p); appendLog('[results] путь скопирован: ' + p); }
+    catch (e) { appendLog('[results] путь: ' + p); }
+}
+
 async function openResultsFolder() {
     const r = await api('results/open-folder', { method: 'POST', body: {} });
     appendLog(r.ok ? '[results] папка открыта: ' + r.path : '[results] не удалось открыть папку');
@@ -515,10 +528,26 @@ async function lookupGeo() {
     for (const [host, g] of entries) {
         const div = document.createElement('div');
         div.className = 'live-item';
-        div.innerHTML = `<span>${esc(g.flag)} ${esc(g.country || '?')}</span><span class="mono">${esc(host)}</span>`;
+        div.innerHTML = `<span>${esc(g.flag)} ${esc(g.country || '?')} <small class="text-muted">(${esc(g.cc || '—')}, ${esc(g.source || 'cache')})</small></span><span class="mono">${esc(host)}</span>`;
         box.appendChild(div);
     }
     appendLog(`[geo] определено: ${entries.length}`);
+}
+
+async function refreshGeo() {
+    const t = await api('targets');
+    const urls = (t.targets || []).map(x => x.url);
+    appendLog('[geo] перепроверка через все провайдеры...');
+    const r = await api('geo/refresh', { method: 'POST', body: { urls } });
+    const box = $('geoList');
+    box.innerHTML = '';
+    for (const [host, g] of Object.entries(r.geo || {})) {
+        const div = document.createElement('div');
+        div.className = 'live-item';
+        div.innerHTML = `<span>${esc(g.flag)} ${esc(g.country || '?')} <small class="text-muted">(${esc(g.cc || '—')}, ${esc(g.source || 'cache')})</small></span><span class="mono">${esc(host)}</span>`;
+        box.appendChild(div);
+    }
+    appendLog(`[geo] перепроверено: ${Object.keys(r.geo || {}).length}`);
 }
 
 async function refreshSources() {
