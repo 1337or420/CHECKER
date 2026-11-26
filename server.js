@@ -327,7 +327,7 @@ const server = http.createServer(async (req, res) => {
                             tcpTimeout: body.tcpTimeout || 1200, limit: body.limit || 0,
                             exclude: settings.get().excludeCountries,
                             autoAdd: body.autoAdd !== undefined ? !!body.autoAdd : settings.get().autoAddTargets,
-                            keepOpen: body.keepOpen === true,
+                            keepOpen: body.keepOpen !== false,
                             strategy: body.strategy || 'edge',
                         }));
                     }
