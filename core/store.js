@@ -79,8 +79,60 @@ function readText(name) {
     try { return fs.readFileSync(file(name), 'utf8'); } catch (e) { return ''; }
 }
 
+// ---- category result files: data/results/<type>/<YYYY-MM-DD>.txt ----
+const RESULTS_DIR = path.join(DATA_DIR, 'results');
+if (!fs.existsSync(RESULTS_DIR)) fs.mkdirSync(RESULTS_DIR, { recursive: true });
+
+function resultPath(type, day) {
+    const safe = String(type || 'other').replace(/[^a-z0-9_-]/gi, '').slice(0, 32) || 'other';
+    const dir = path.join(RESULTS_DIR, safe);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    return path.join(dir, (day || new Date().toISOString().slice(0, 10)) + '.txt');
+}
+
+function appendResult(type, line) {
+    try { fs.appendFileSync(resultPath(type), String(line) + '\r\n'); return true; } catch (e) { return false; }
+}
+
+function resultCategories() {
+    try {
+        return fs.readdirSync(RESULTS_DIR, { withFileTypes: true })
+            .filter(d => d.isDirectory())
+            .map(d => ({
+                type: d.name,
+                files: fs.readdirSync(path.join(RESULTS_DIR, d.name)).filter(f => f.endsWith('.txt')).map(f => ({
+                    name: f,
+                    lines: fs.readFileSync(path.join(RESULTS_DIR, d.name, f), 'utf8').split(/\r?\n/).filter(Boolean).length,
+                    size: fs.statSync(path.join(RESULTS_DIR, d.name, f)).size,
+                })),
+            }))
+            .filter(c => c.files.length)
+            .sort((a, b) => a.type.localeCompare(b.type));
+    } catch (e) { return []; }
+}
+
+function readResults(type) {
+    const safe = String(type || '').replace(/[^a-z0-9_-]/gi, '').slice(0, 32);
+    const dir = path.join(RESULTS_DIR, safe);
+    try {
+        return fs.readdirSync(dir).filter(f => f.endsWith('.txt')).sort().map(f => fs.readFileSync(path.join(dir, f), 'utf8')).join('');
+    } catch (e) { return ''; }
+}
+
+function clearResults() {
+    try {
+        for (const c of resultCategories()) {
+            for (const f of c.files) fs.unlinkSync(path.join(RESULTS_DIR, c.type, f.name));
+        }
+        return true;
+    } catch (e) { return false; }
+}
+
 function remove(name) {
     try { if (fs.existsSync(file(name))) fs.unlinkSync(file(name)); return true; } catch (e) { return false; }
 }
 
-module.exports = { DATA_DIR, file, load, save, saveSoon, flush, append, readText, remove, writeAtomic };
+module.exports = {
+    DATA_DIR, RESULTS_DIR, file, load, save, saveSoon, flush, append, readText, remove, writeAtomic,
+    appendResult, resultCategories, readResults, clearResults, resultPath,
+};
