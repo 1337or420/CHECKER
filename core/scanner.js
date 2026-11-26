@@ -172,20 +172,26 @@ async function scanTask(task, emit) {
                 if (!hit && info.forti) {
                     hit = 'Fortinet FortiGate SSL-VPN';
                     page = info.kind || 'logincheck';
-                } else if (hit && !info.forti) {
+                } else if (hit && info.kind === 'decoy') {
+                    // only a proven static decoy cancels a fingerprint hit
                     hit = null;
                     page = null;
+                } else if (hit && !info.forti && info.evidence && info.evidence.length) {
+                    // custom branding / partial signals: keep the hit with evidence
+                    hit = 'Fortinet SSL-VPN (по сигнатуре)';
                 }
             }
+            const openRec = {
+                host, port, url: base,
+                status: probe && probe.status ? probe.status : null,
+                title: ((probe && probe.body || '').match(/<title>([^<]{1,80})/i) || [])[1] || '',
+                server: probe && probe.headers ? (probe.headers.server || '') : '',
+                evidence: info ? (info.evidence || []) : [],
+                time: new Date().toISOString(),
+            };
+            if (task.keepOpen !== false) emit('scan_open', openRec);
             finishHost();
             if (!hit) {
-                if (task.keepOpen) emit('scan_open', {
-                    host, port, url: base,
-                    status: probe && probe.status ? probe.status : null,
-                    title: ((probe && probe.body || '').match(/<title>([^<]{1,80})/i) || [])[1] || '',
-                    server: probe && probe.headers ? (probe.headers.server || '') : '',
-                    time: new Date().toISOString(),
-                });
                 progress(false);
                 continue;
             }
