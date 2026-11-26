@@ -192,7 +192,7 @@ function serveStatic(req, res, pathname) {
         const ext = path.extname(full);
         res.writeHead(200, {
             'Content-Type': MIME[ext] || 'application/octet-stream',
-            'Cache-Control': ext === '.html' ? 'no-cache' : 'max-age=60',
+            'Cache-Control': 'no-store',
         });
         res.end(buf);
     });
