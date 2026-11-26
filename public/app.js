@@ -67,6 +67,12 @@ function setProgress(d) {
     const speed = d.rate ? ` · ${Number(d.rate).toFixed(1)}/с` : '';
     const eta = d.rate && d.total - done > 0 ? ` · ETA ${Math.ceil((d.total - done) / d.rate)}с` : '';
     bar.textContent = `${pct}% (${done}/${d.total}${d.found ? ', found: ' + d.found : ''})${speed}${eta}`;
+    const gb = $('gpBar');
+    if (gb) { gb.style.width = pct + '%'; gb.textContent = `${pct}% (${done}/${d.total})`; }
+    const gl = $('gpLabel');
+    if (gl) gl.textContent = `${(currentTaskType || 'task').toUpperCase()}${d.found !== undefined ? ` · found ${d.found}` : ''}`;
+    const gr = $('gpRate');
+    if (gr) gr.textContent = d.rate ? `${Number(d.rate).toFixed(1)}/с` : '';
     $('rateInfo').textContent = d.rate ? `${Number(d.rate).toFixed(1)} проверок/с` : '';
 }
 
@@ -138,6 +144,8 @@ function updateState(st) {
         badge.className = 'badge bg-success';
         badge.textContent = 'RUN: ' + st.type + (st.paused ? ' (пауза)' : '');
         $('taskInfo').textContent = 'Выполняется: ' + st.type;
+        const gl = $('gpLabel');
+        if (gl) gl.textContent = String(st.type).toUpperCase();
     } else {
         badge.className = 'badge bg-secondary';
         badge.textContent = 'Idle';
@@ -145,6 +153,12 @@ function updateState(st) {
         $('rateInfo').textContent = '';
         const bar = $('progressBar');
         if (bar) { bar.style.width = '0%'; bar.textContent = st.stopped ? 'остановлено' : '0%'; }
+        const gb = $('gpBar');
+        if (gb) { gb.style.width = '0%'; gb.textContent = st.stopped ? 'остановлено' : '0%'; }
+        const gl = $('gpLabel');
+        if (gl) gl.textContent = st.stopped ? 'ОСТАНОВЛЕНО' : 'Idle';
+        const gr = $('gpRate');
+        if (gr) gr.textContent = '';
     }
 }
 
