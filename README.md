@@ -48,7 +48,7 @@ start.bat          # или: node server.js
 | **ADRecon** | Интегрированный Go/Docker модуль: VPN-конфиги → воркеры → отчёты; импорт конфигов в цели панели |
 | **Авто-цепочка** | Находки сканера автоматически уходят в брут и в слив кред (CVE-2018-13379) |
 | **Гео / Источники** | 3 гео-провайдера с кэшем, скачивание CIDR стран (ipdeny + 3 зеркала) |
-| **Результаты** | Экспорт TXT / CSV / JSON, накопительный `found_creds.txt` |
+| **Результаты** | Экспорт TXT / CSV / JSON, папки по категориям `data/results/<type>/*.txt`, кнопка открытия папки |
 
 ## API
 
@@ -57,6 +57,7 @@ start.bat          # или: node server.js
 - `POST /api/start` `{type: scan|fastscan|brute|check|exploit|harvest|adrecon, ...}`
 - `POST /api/pause` / `POST /api/stop`
 - `GET  /api/results`, `POST /api/results/clear`
+- `GET  /api/results/text?type=brute`, `POST /api/results/open-folder`
 - `GET  /api/export?type=brute&format=txt|csv|json`
 - `GET  /api/found[?format=txt|csv]`, `DELETE /api/found`
 - `GET/POST /api/settings` (прокси, RPS, параллельность, авто-брут)
@@ -76,6 +77,7 @@ node tests/adrecon.test.js # парсер VPN-конфигов и статус �
 node tests/stop.test.js    # кнопка Stop: мгновенный SSE task_state
 node tests/scan.test.js    # CIDR-скан: прогресс и завершение задачи
 node tests/fastscan.test.js # быстрый TCP-сканер: открытый/закрытый порт
+node tests/results.test.js  # папки результатов по категориям, txt, очистка
 ```
 
 ## Автор
@@ -168,6 +170,7 @@ A successful login is detected via `ret=1` **and/or** `Set-Cookie: SVPNCOOKIE`, 
 - `POST /api/start` `{type: scan|fastscan|brute|check|exploit|harvest|adrecon, ...}`
 - `POST /api/pause`, `POST /api/stop`
 - `GET  /api/results`, `POST /api/results/clear`
+- `GET  /api/results/text?type=brute`, `POST /api/results/open-folder`
 - `GET  /api/export?type=brute&format=txt|csv|json`
 - `GET  /api/found[?format=txt|csv]`, `DELETE /api/found`
 - `GET/POST /api/settings`, `GET/POST /api/wordlists`
@@ -185,6 +188,7 @@ node tests/adrecon.test.js # ADRecon config parser and module info
 node tests/stop.test.js    # Stop button: immediate SSE task_state
 node tests/scan.test.js    # CIDR scan: progress events and completion
 node tests/fastscan.test.js # fast TCP scanner: open/closed port
+node tests/results.test.js  # per-category result folders, txt, clear
 ```
 
 ## Author
