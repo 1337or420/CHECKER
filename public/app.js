@@ -4,6 +4,7 @@
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[<>&"]/g, ch => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[ch]));
 const ts = iso => new Date(iso || Date.now()).toLocaleTimeString();
+let currentTaskType = null;
 
 async function api(path, opts = {}) {
     const res = await fetch('/api/' + path, {
@@ -61,13 +62,13 @@ es.addEventListener('task_state', e => updateState(JSON.parse(e.data)));
 es.addEventListener('task_done', e => {
     const d = JSON.parse(e.data);
     updateState({ running: false });
+    loadFound(); loadResults(); refreshStats();
     const r = d.result || {};
     const total = r.total || r.tried || 1;
     const done = r.scanned || r.tried || total;
     setProgress({ done, total, found: r.found ?? r.valid ?? r.leaked, rate: r.elapsed ? done / (r.elapsed / 1000) : undefined });
     const gl = $('gpLabel');
     if (gl) gl.textContent = `DONE: ${d.type}`;
-    loadFound(); loadResults(); refreshStats();
 });
 
 function bump(id) { const el = $(id); if (el) el.textContent = String((parseInt(el.textContent, 10) || 0) + 1); }
@@ -84,7 +85,7 @@ function setProgress(d) {
     const gb = $('gpBar');
     if (gb) { gb.style.width = pct + '%'; gb.textContent = `${pct}% (${done}/${d.total})`; }
     const gl = $('gpLabel');
-    if (gl) gl.textContent = `${(currentTaskType || 'task').toUpperCase()}${d.found !== undefined ? ` · found ${d.found}` : ''}`;
+    if (gl) gl.textContent = `${String(typeof currentTaskType !== 'undefined' && currentTaskType ? currentTaskType : 'task').toUpperCase()}${d.found !== undefined ? ` · found ${d.found}` : ''}`;
     const gr = $('gpRate');
     if (gr) gr.textContent = d.rate ? `${Number(d.rate).toFixed(1)}/с` : '';
     const extra = [];
@@ -183,12 +184,14 @@ function updateState(st) {
         badge.className = 'badge bg-success';
         badge.textContent = 'RUN: ' + st.type + (st.paused ? ' (пауза)' : '');
         $('taskInfo').textContent = 'Выполняется: ' + st.type;
+        currentTaskType = st.type;
         const gl = $('gpLabel');
         if (gl) gl.textContent = String(st.type).toUpperCase();
     } else {
         badge.className = 'badge bg-secondary';
         badge.textContent = 'Idle';
         $('taskInfo').textContent = '— нет активных задач —';
+        currentTaskType = null;
         $('rateInfo').textContent = '';
         const bar = $('progressBar');
         if (bar) { bar.style.width = '0%'; bar.textContent = st.stopped ? 'остановлено' : '0%'; }
@@ -395,9 +398,16 @@ async function loadResults() {
         fetch('/api/results/text?type=' + encodeURIComponent(resultTab)).then(x => x.text()).catch(() => ''),
     ]);
     const rows = (text || '').split(/\r?\n/).filter(Boolean);
-    $('resultsBox').value = rows.length
-        ? rows.join('\n')
-        : '— нет результатов в категории "' + resultTab + '" —\nПроверьте папку data/results/' + resultTab + '/';
+    let shown = '';
+    if (rows.length) {
+        shown = rows.join('\n');
+    } else {
+        const ev = (((r.results || {}).events) || []).filter(x => x.type === resultTab).slice(-30);
+        shown = ev.length
+            ? ev.map(x => JSON.stringify(x)).join('\n') + '\n\n(сводки завершённых задач; находок в файлах нет)'
+            : '— нет результатов в категории "' + resultTab + '" —\nПроверьте папку data/results/' + resultTab + '/';
+    }
+    $('resultsBox').value = shown;
     const cat = ((r.files || []).find(f => f.type === resultTab) || {});
     const totalLines = (cat.files || []).reduce((n, f) => n + f.lines, 0);
     const p = $('resultsPath');
