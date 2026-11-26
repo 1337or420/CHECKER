@@ -6,6 +6,7 @@
 const { request, parseRanges, rangesTotal, tcpOpen, intToIp } = require('./http');
 const { PRESETS } = require('./signatures');
 const forti = require('./forti');
+const stackfp = require('./fingerprint');
 const geo = require('./geo');
 const targets = require('./targets');
 const settings = require('./settings');
@@ -181,14 +182,21 @@ async function scanTask(task, emit) {
                     hit = 'Fortinet SSL-VPN (по сигнатуре)';
                 }
             }
+            const fp = await stackfp.probe(base, { timeout: Math.min(timeout, 2500) }).catch(() => ({}));
             const openRec = {
                 host, port, url: base,
-                status: probe && probe.status ? probe.status : null,
-                title: ((probe && probe.body || '').match(/<title>([^<]{1,80})/i) || [])[1] || '',
-                server: probe && probe.headers ? (probe.headers.server || '') : '',
+                status: fp.status !== undefined ? fp.status : (probe && probe.status ? probe.status : null),
+                title: fp.title || ((probe && probe.body || '').match(/<title>([^<]{1,80})/i) || [])[1] || '',
+                server: fp.server || (probe && probe.headers ? (probe.headers.server || '') : ''),
+                product: fp.product || null,
+                tech: fp.tech || [],
+                lang: fp.lang || null,
+                panels: fp.panels || [],
+                generator: fp.generator || null,
                 evidence: info ? (info.evidence || []) : [],
                 time: new Date().toISOString(),
             };
+            openRec.line = `${host}:${port} ${openRec.title || ''} | ${openRec.product || 'unknown'} | ${openRec.lang || openRec.tech.join(',') || ''}`;
             if (task.keepOpen !== false) emit('scan_open', openRec);
             finishHost();
             if (!hit) {
