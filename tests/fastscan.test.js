@@ -15,7 +15,7 @@ const fastscan = require('../core/fastscan');
         timeout: 500, limit: 2, strategy: 'random',
     }, emit);
 
-    await new Promise(r => srv.close(r));
+    srv.close();
     const open = events.filter(e => e[0] === 'fastscan_open');
     assert.ok(open.length >= 1, 'open port not detected');
     assert.ok(open.some(e => e[1].port === port), 'listening port missing');
