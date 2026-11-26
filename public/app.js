@@ -385,17 +385,24 @@ async function stopTask() { await api('stop', { method: 'POST' }); }
 let resultTab = 'scan';
 
 async function loadResults() {
-    const r = await api('results');
-    const all = r.results || {};
-    const list = all[resultTab] || [];
-    if (!list.length && resultTab === 'scan' && (all.events || []).length) {
-        const ev = all.events.filter(x => x.type === 'scan').slice(-50);
-        $('resultsBox').value = ev.map(x => JSON.stringify(x)).join('\n')
-            + '\n\n(находок нет — это сводки завершённых сканов)';
-    } else {
-        $('resultsBox').value = list.map(x => x.line || JSON.stringify(x)).join('\n');
-    }
+    const [r, text] = await Promise.all([
+        api('results'),
+        fetch('/api/results/text?type=' + encodeURIComponent(resultTab)).then(x => x.text()).catch(() => ''),
+    ]);
+    const rows = (text || '').split(/\r?\n/).filter(Boolean);
+    $('resultsBox').value = rows.length
+        ? rows.join('\n')
+        : '— нет результатов в категории "' + resultTab + '" —\nПроверьте папку data/results/' + resultTab + '/';
+    const cat = ((r.files || []).find(f => f.type === resultTab) || {});
+    const totalLines = (cat.files || []).reduce((n, f) => n + f.lines, 0);
+    const p = $('resultsPath');
+    if (p) p.textContent = `${r.dir || 'data/results'}${String(r.dir || '').endsWith('results') ? '/' + resultTab + '/' : ' → ' + resultTab}  ·  строк: ${totalLines}`;
     if (r.logs) { $('logBox').value = r.logs.join('\n') + '\n'; $('logBox').scrollTop = $('logBox').scrollHeight; }
+}
+
+async function openResultsFolder() {
+    const r = await api('results/open-folder', { method: 'POST', body: {} });
+    appendLog(r.ok ? '[results] папка открыта: ' + r.path : '[results] не удалось открыть папку');
 }
 
 async function clearResults() {
