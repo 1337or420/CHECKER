@@ -81,6 +81,14 @@ async function scanTask(task, emit) {
     }
 
     let found = 0, done = 0, dead = 0;
+    const scanStarted = Date.now();
+    const heartbeat = setInterval(() => {
+        const sec = (Date.now() - scanStarted) / 1000;
+        emit('scan_progress', {
+            done, total, found, dead, heartbeat: true,
+            elapsed: Math.round(sec), rate: sec > 0 ? Math.round(done / sec) : 0,
+        });
+    }, 2000);
     const exclude = (task.exclude || []).map(c => String(c).toLowerCase());
     const excl = new Set(exclude);
 
@@ -201,6 +209,7 @@ async function scanTask(task, emit) {
     const pool = [];
     for (let i = 0; i < Math.min(threads, Math.max(1, total)); i++) pool.push(worker());
     await Promise.all(pool);
+    clearInterval(heartbeat);
 
     progress(true);
     const out = { total, found, dead, scanned: done, stopped: !!task.stopped };
