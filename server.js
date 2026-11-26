@@ -26,8 +26,9 @@ const PUBLIC = path.join(__dirname, 'public');
 const VERSION = '2.0.0';
 const MAX_RESULTS = 100000;
 
-const results = store.load('results.json', { scan: [], brute: [], check: [], exploit: [], open: [], adrecon: [] });
-for (const k of Object.keys(results)) if (!Array.isArray(results[k])) results[k] = [];
+const RESULT_KEYS = ['scan', 'brute', 'check', 'exploit', 'open', 'adrecon', 'events'];
+const results = store.load('results.json', { scan: [], brute: [], check: [], exploit: [], open: [], adrecon: [], events: [] });
+for (const k of RESULT_KEYS) if (!Array.isArray(results[k])) results[k] = [];
 const logs = [];
 const clients = new Set();
 let task = null;
@@ -84,6 +85,13 @@ function makeEmitter(type) {
         }
         if (name === 'hit' || name === 'cred') {
             (results[type] = results[type] || []).push(data);
+            persistSoon();
+        }
+        // Always keep a summary, even when a task found nothing — otherwise
+        // the Results tab looks empty and the user thinks the task never ran.
+        if (name === 'done') {
+            results.events.push({ type, ...(data || {}), time: new Date().toISOString() });
+            if (results.events.length > MAX_RESULTS) results.events = results.events.slice(-MAX_RESULTS);
             persistSoon();
         }
         if (name === 'hit' && type === 'scan') maybeAutoBrute(data);
