@@ -49,8 +49,10 @@ function setProgress(d) {
     const pct = Math.min(100, Math.round((done / d.total) * 100));
     const bar = $('progressBar');
     bar.style.width = pct + '%';
-    bar.textContent = `${pct}% (${done}/${d.total}${d.valid ? ', valid: ' + d.valid : ''}${d.found ? ', found: ' + d.found : ''})`;
-    $('rateInfo').textContent = d.rate ? d.rate.toFixed(1) + ' кред/с' : '';
+    const speed = d.rate ? ` · ${Number(d.rate).toFixed(1)}/с` : '';
+    const eta = d.rate && d.total - done > 0 ? ` · ETA ${Math.ceil((d.total - done) / d.rate)}с` : '';
+    bar.textContent = `${pct}% (${done}/${d.total}${d.found ? ', found: ' + d.found : ''})${speed}${eta}`;
+    $('rateInfo').textContent = d.rate ? `${Number(d.rate).toFixed(1)} проверок/с` : '';
 }
 
 function appendLog(text) {
