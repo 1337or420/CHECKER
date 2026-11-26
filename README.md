@@ -42,6 +42,7 @@ start.bat          # или: node server.js
 |---|---|
 | **Сканер** | CIDR / диапазоны / мультипорт, TCP-пречек, 6 пресетов сигнатур, случайная или «edge» (/24 .1/.2/.3/.254) выборка, сохранение всех открытых портов, отсев только доказанных декоев |
 | **FastScan** | Свой массовый TCP-сканер в духе masscan/rustscan: пул connect, DNS-кэш, до 32 портов, limiter и heartbeat |
+| **Фингерпринт** | Для каждого открытого порта определяется сайт/панель, заголовки, стек и язык (PHP/Python/Java/Node/Go…) |
 | **Брутфорс** | Режимы `smart` / `combo` / `cross`, потоки + лимит на хост + RPS, стоп после N валидных, дефолтные словари |
 | **Чекер** | Ревалидация пар и целей, статусы alive/dead/locked/2FA |
 | **Эксплоиты** | CVE-2018-13379 (слив кред), CVE-2022-40684, XML-сниффинг, версионные эвристики |
@@ -78,6 +79,7 @@ node tests/stop.test.js    # кнопка Stop: мгновенный SSE task_st
 node tests/scan.test.js    # CIDR-скан: прогресс и завершение задачи
 node tests/fastscan.test.js # быстрый TCP-сканер: открытый/закрытый порт
 node tests/websession.test.js # парсер sslvpn_websession (61-байтовые записи)
+node tests/fingerprint.test.js # определение панели/стека/языка по открытому порту
 node tests/results.test.js  # папки результатов по категориям, txt, очистка
 ```
 
@@ -156,6 +158,7 @@ A successful login is detected via `ret=1` **and/or** `Set-Cookie: SVPNCOOKIE`, 
 |---|---|
 | **Scanner** | CIDR / ranges / multi-port, TCP pre-check, 6 signature presets, random or edge (/24 .1/.2/.3/.254) sampling, all open ports saved, only proven decoys filtered out |
 | **FastScan** | Own mass TCP scanner in the spirit of masscan/rustscan: connect pool, DNS cache, up to 32 ports, limiter and heartbeat |
+| **Fingerprint** | Every open port is identified: site/panel, headers, tech stack and language (PHP/Python/Java/Node/Go...) |
 | **Brute force** | `smart` / `combo` / `cross` modes, threads + per-host limit + RPS, stop after N hits, built-in wordlists |
 | **Checker** | Re-validation of pairs and targets, alive/dead/locked/2FA states |
 | **Exploits** | CVE-2018-13379 credential leak, CVE-2022-40684, XML recon, version heuristics |
@@ -190,6 +193,7 @@ node tests/stop.test.js    # Stop button: immediate SSE task_state
 node tests/scan.test.js    # CIDR scan: progress events and completion
 node tests/fastscan.test.js # fast TCP scanner: open/closed port
 node tests/websession.test.js # sslvpn_websession parser (61-byte records)
+node tests/fingerprint.test.js # panel/stack/language detection on open port
 node tests/results.test.js  # per-category result folders, txt, clear
 ```
 
