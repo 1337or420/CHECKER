@@ -225,7 +225,7 @@ function request(urlStr, opts = {}) {
                     Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
                     'Accept-Language': 'en-US,en;q=0.9',
                     'Accept-Encoding': 'identity',
-                    Connection: 'keep-alive',
+                    Connection: opts.agent === false ? 'close' : 'keep-alive',
                     ...(data ? { 'Content-Type': opts.contentType || 'application/x-www-form-urlencoded', 'Content-Length': data.length } : {}),
                     ...opts.headers,
                 }),
