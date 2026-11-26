@@ -154,6 +154,7 @@ async function refreshStats() {
     $('statBrute').textContent = s.counts ? s.counts.brute : 0;
     $('statCheck').textContent = s.counts ? s.counts.check : 0;
     $('statExploit').textContent = s.counts ? s.counts.exploit : 0;
+    $('statOpen').textContent = s.counts ? (s.counts.open || 0) : 0;
     loadFound();
 }
 
